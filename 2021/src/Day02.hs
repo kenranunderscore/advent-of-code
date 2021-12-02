@@ -1,3 +1,5 @@
+module Day02 where
+
 main :: IO ()
 main = do
   rows <- lines <$> readFile "./data/day02"

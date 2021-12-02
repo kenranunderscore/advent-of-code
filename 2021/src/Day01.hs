@@ -1,5 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
+module Day01 where
+
 import Data.Function ((&))
 
 main :: IO ()
