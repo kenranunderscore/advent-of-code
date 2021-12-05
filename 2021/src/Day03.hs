@@ -2,8 +2,8 @@
 
 module Day03 where
 
-import Data.Ord
 import Data.List
+import Data.Ord
 
 main :: IO ()
 main = do
@@ -12,10 +12,6 @@ main = do
       cols = transpose vals
       epsilonRate = leastCommonVal <$> cols
       gammaRate = flipVal <$> epsilonRate
-  print gammaRate
-  print epsilonRate
-  print $ toInt gammaRate
-  print $ toInt epsilonRate
   print $ toInt epsilonRate * toInt gammaRate
 
 data Val = Zero | One
@@ -23,19 +19,15 @@ data Val = Zero | One
 
 toInt :: [Val] -> Int
 toInt =
-  sum
-    . map (\(e, x) -> if x == One then 2 ^ e else 0)
-    . zip [0..]
-    . reverse
-  
+  sum . map (\(e, x) -> if x == One then 2 ^ e else 0) . zip [0 ..] . reverse
+
 flipVal :: Val -> Val
 flipVal = \case
   Zero -> One
   One -> Zero
 
 readVals :: String -> [Val]
-readVals s = 
-  readVal <$> s
+readVals s = readVal <$> s
   where
     readVal = \case
       '1' -> One
@@ -43,5 +35,4 @@ readVals s =
       x -> error $ show x
 
 leastCommonVal :: (Eq a, Ord a) => [a] -> a
-leastCommonVal =
-  head . concat . sortBy (comparing length) . group . sort
+leastCommonVal = head . concat . sortBy (comparing length) . group . sort

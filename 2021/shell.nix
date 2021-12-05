@@ -1,6 +1,10 @@
 { pkgs ? import <nixpkgs> { } }:
 
 pkgs.mkShell {
-  nativeBuildInputs =
-    [ pkgs.ghc pkgs.cabal-install pkgs.haskellPackages.ghcid ];
+  nativeBuildInputs = [
+    pkgs.ghc
+    pkgs.cabal-install
+    pkgs.haskellPackages.ghcid
+    pkgs.haskellPackages.ormolu
+  ];
 }
