@@ -5,34 +5,50 @@ module Day03 where
 import Data.List
 import Data.Ord
 
+data Bit = Zero | One
+  deriving (Ord, Show, Eq)
+
+type Binary = [Bit]
+
 main :: IO ()
 main = do
   rows <- lines <$> readFile "./data/day03"
-  let vals = readVals <$> rows
+  let vals = readBits <$> rows
       cols = transpose vals
-      epsilonRate = leastCommonVal <$> cols
-      gammaRate = flipVal <$> epsilonRate
-  print $ toInt epsilonRate * toInt gammaRate
+      e = epsilonRate cols
+      g = gammaRate cols
+  print $ toInt e * toInt g
 
-data Val = Zero | One
-  deriving (Ord, Show, Eq)
+epsilonRate :: [Binary] -> Binary
+epsilonRate = fmap leastCommonBit
 
-toInt :: [Val] -> Int
+gammaRate :: [Binary] -> Binary
+gammaRate = fmap flipBit . epsilonRate
+
+toInt :: Binary -> Int
 toInt =
-  sum . map (\(e, x) -> if x == One then 2 ^ e else 0) . zip [0 ..] . reverse
+  sum
+    . map (\(e, x) -> if x == One then 2 ^ e else 0)
+    . zip [0 ..]
+    . reverse
 
-flipVal :: Val -> Val
-flipVal = \case
+flipBit :: Bit -> Bit
+flipBit = \case
   Zero -> One
   One -> Zero
 
-readVals :: String -> [Val]
-readVals s = readVal <$> s
+readBits :: String -> Binary
+readBits s = readBit <$> s
   where
-    readVal = \case
+    readBit = \case
       '1' -> One
       '0' -> Zero
       x -> error $ show x
 
-leastCommonVal :: (Eq a, Ord a) => [a] -> a
-leastCommonVal = head . concat . sortBy (comparing length) . group . sort
+leastCommonBit :: (Eq a, Ord a) => [a] -> a
+leastCommonBit =
+  head
+    . concat
+    . sortBy (comparing length)
+    . group
+    . sort
