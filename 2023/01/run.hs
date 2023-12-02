@@ -9,13 +9,10 @@ import Data.Char
 import Data.Function ((&))
 
 part1 :: [String] -> Int
-part1 ls = do
-  let ns = fmap
-               (\line ->
-                   let digits = filter isDigit line
-                   in read @Int [head digits, last digits])
-               ls
-  sum ns
+part1 =
+  sum . fmap (\line ->
+                let digits = filter isDigit line
+                in read @Int [head digits, last digits])
 
 -- | HAHAHA this is the ugliest solution ever
 transform :: String -> String
@@ -35,12 +32,10 @@ transform = \case
       | otherwise -> x : transform xs
 
 part2 :: [String] -> Int
-part2 ls = do
-  let transformed = fmap transform ls
-  part1 transformed
+part2 = part1 . fmap transform
 
 main :: IO ()
 main = do
-  ls <- lines <$> readFile "input"
-  print $ part1 ls
-  print $ part2 ls
+  input <- lines <$> readFile "input"
+  print $ part1 input
+  print $ part2 input
