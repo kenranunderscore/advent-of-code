@@ -76,7 +76,25 @@ part1 =
   . filter isPossible
   . fmap readGame
 
+minimumSetOfCubes :: Game -> SetOfCubes
+minimumSetOfCubes game =
+  let redMin = maximum $ fmap (.red) game.samples
+      greenMin = maximum $ fmap (.green) game.samples
+      blueMin = maximum $ fmap (.blue) game.samples
+  in SetOfCubes { red = redMin, green = greenMin, blue = blueMin }
+
+power :: SetOfCubes -> Int
+power set = set.red * set.green * set.blue
+
+part2 :: [String] -> Int
+part2 =
+  sum
+  . fmap power
+  . fmap minimumSetOfCubes
+  . fmap readGame
+
 main :: IO ()
 main = do
   input <- lines <$> readFile "input"
   print $ part1 input
+  print $ part2 input
