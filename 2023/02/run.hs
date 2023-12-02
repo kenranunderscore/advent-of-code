@@ -6,17 +6,23 @@
 import Data.List
 import Control.Monad
 import Data.Char
+import Data.Maybe qualified as Maybe
 import Data.Function ((&))
 import Data.Map.Strict qualified as Map
 
 data Color = Red | Green | Blue
   deriving (Show, Ord, Enum, Eq)
 
-type Sample = Map.Map Color Int
+data SetOfCubes = SetOfCubes
+  { red :: Int
+  , green :: Int
+  , blue :: Int
+  }
+  deriving Show
 
 data Game = Game
   { number :: Int
-  , samples :: [Sample]
+  , samples :: [SetOfCubes]
   }
   deriving Show
 
@@ -31,9 +37,14 @@ splitList separator =
          else (char:currentPart, parts))
       ([], [])
 
-readSample :: String -> Sample
-readSample =
-  Map.fromList . fmap readColorInfo . splitList ','
+readSetOfCubes :: String -> SetOfCubes
+readSetOfCubes s =
+  SetOfCubes { red = Maybe.fromMaybe 0 (Map.lookup Red m)
+             , green = Maybe.fromMaybe 0 (Map.lookup Green m)
+             , blue = Maybe.fromMaybe 0 (Map.lookup Blue m)
+             }
+  where
+    m = Map.fromList $ fmap readColorInfo $ splitList ',' s
 
 readColorInfo :: String -> (Color, Int)
 readColorInfo s =
@@ -46,20 +57,16 @@ readColorInfo s =
 
 readGame :: String -> Game
 readGame line =
-  let [game, rawSamples] = splitList ':' line
+  let [game, rawSets] = splitList ':' line
       n :: Int = read $ filter isDigit game
-      samples = fmap readSample $ splitList ';' rawSamples
+      samples = fmap readSetOfCubes $ splitList ';' rawSets
   in Game n samples
 
 isPossible :: Game -> Bool
 isPossible game =
   all
     (\sample ->
-       let mred = Map.lookup Red sample
-           mgreen = Map.lookup Green sample
-           mblue = Map.lookup Blue sample
-       -- Nothing < everything, otherwise it's the usual 'Ord'
-       in mred <= Just 12 && mgreen <= Just 13 && mblue <= Just 14)
+       sample.red <= 12 && sample.green <= 13 && sample.blue <= 14)
     game.samples
 
 part1 :: [String] -> Int
