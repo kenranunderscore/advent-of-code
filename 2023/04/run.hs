@@ -10,6 +10,7 @@ import Data.Char
 import Data.Maybe qualified as Maybe
 import Data.Function ((&))
 import Data.Set qualified as S
+import Data.Vector qualified as V
 
 data Card = Card
   { winningNumbers :: S.Set Int
@@ -36,16 +37,39 @@ readCard s =
   where
     readNumbers = S.fromList . fmap read . splitList ' '
 
+matchingNumbers :: Card -> Int
+matchingNumbers c =
+  length $ S.intersection c.winningNumbers c.numbersIHave
+
 part1 :: [String] -> Int
 part1 input =
   input
     & fmap readCard
-    & fmap (\c ->
-              let n = length $ S.intersection c.winningNumbers c.numbersIHave
+    & fmap (\card ->
+              let n = matchingNumbers card
               in if n == 0 then 0 else 2 ^ (n - 1))
     & sum
+
+type Cards = V.Vector Card
+
+readCards :: [String] -> Cards
+readCards = V.fromList . fmap readCard
+
+cardScore :: Cards -> Int -> Int
+cardScore allCards cardIndex =
+  let n = matchingNumbers (allCards V.! cardIndex)
+  in 1 + (sum $ fmap (cardScore allCards) [cardIndex + 1 .. cardIndex + n])
+
+part2 :: [String] -> Int
+part2 input =
+  allCards
+    & V.imap (\i _ -> cardScore allCards i)
+    & sum
+  where
+    allCards = readCards input
 
 main :: IO ()
 main = do
   input <- lines <$> readFile "input"
   print $ part1 input
+  print $ part2 input
