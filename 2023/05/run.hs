@@ -5,8 +5,7 @@
 
 import Data.Attoparsec.Text
 import Data.Foldable (foldl')
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as M
+import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import Data.Text.IO qualified as T
 
@@ -35,19 +34,10 @@ ranges name = do
 
 type Ranges = [Range]
 
-type Mapping = Map Int Int
-
-createMapping :: [Range] -> Mapping
-createMapping =
-    foldl' applyRange (M.fromList [(i, i) | i <- [1 .. 100]])
-  where
-    applyRange m range =
-        M.union (rangeToMap range) m
-    rangeToMap range =
-        M.fromList $ zip [range.from .. range.from + range.length - 1] [range.dest ..]
+type Mapping = Ranges
 
 mapping :: Text -> Parser Mapping
-mapping = fmap createMapping . ranges
+mapping = ranges
 
 seedsAndMappings :: Parser (Seeds, [Mapping])
 seedsAndMappings = do
@@ -80,7 +70,22 @@ seedsAndMappings = do
         )
 
 mapSeed :: [Mapping] -> Int -> Int
-mapSeed ms s = foldl' (flip (M.!)) s ms
+mapSeed ms s =
+    foldl'
+        ( \i rs ->
+            case mapMaybe (applyRange i) rs of
+                [] -> i
+                [res] -> res
+                _ -> error "whyyy"
+        )
+        s
+        ms
+
+applyRange :: Int -> Range -> Maybe Int
+applyRange i r =
+    if r.from <= i && i < r.from + r.length
+        then Just $ i + r.dest - r.from
+        else Nothing
 
 part1 :: Text -> Int
 part1 input = do
