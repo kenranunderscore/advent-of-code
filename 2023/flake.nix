@@ -2,10 +2,15 @@
   description = "A very basic flake";
 
   outputs = { self, this }: {
-    devShells.x86_64-linux.default =
-      let pkgs = this.legacyPackages.x86_64-linux; in
-      pkgs.mkShell {
-        buildInputs = [ (pkgs.ghc.withPackages (p: [ p.vector ])) ];
-      };
+    devShells.x86_64-linux.default = let
+      pkgs = this.legacyPackages.x86_64-linux;
+      myGhc = pkgs.ghc.withPackages (p: [ p.vector p.attoparsec ]);
+    in pkgs.mkShell {
+      buildInputs = [
+        myGhc
+        pkgs.haskellPackages.fourmolu
+        pkgs.haskellPackages.haskell-language-server
+      ];
+    };
   };
 }
