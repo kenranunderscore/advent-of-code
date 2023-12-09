@@ -92,42 +92,32 @@ seedsAndMappings = do
     groups <- many1' group
     pure (xs, groups)
 
--- suuuuuper redundant because I (thought I) had an error in the first version
--- and then had to make it obvious
 mapSingleRow :: Range -> MappingRow -> (Maybe Range, [Range])
-mapSingleRow s m
-    | m.from < s.from =
-        if
-            | m.to < s.from ->
-                (Nothing, [s])
-            | m.to < s.to ->
-                -- left part of range only
-                (reallyMap s.from m.to, [mkRange (m.to + 1) s.to])
-            | True ->
-                -- whole range is mapped
-                (reallyMap s.from s.to, mempty)
-    | m.from == s.from =
-        if
-            | m.to < s.to ->
-                (reallyMap m.from m.to, [mkRange (m.to + 1) s.to])
-            | True ->
-                -- whole range is mapped
-                (reallyMap s.from s.to, mempty)
-    | m.from < s.to =
-        if
-            | m.to < s.to ->
-                -- mapping fully contained -> two unmapped ranges
-                (reallyMap m.from m.to, [mkRange s.from (m.from - 1), mkRange (m.to + 1) s.to])
-            | True ->
-                (reallyMap m.from s.to, [mkRange s.from (m.from - 1)])
-    | m.from == s.to =
-        (reallyMap s.to s.to, [mkRange s.from (s.to - 1)])
-    | m.from > s.to =
-        (Nothing, [s])
-    | otherwise =
-        error "impossible m.from"
+mapSingleRow r m =
+    if
+        | m.to < r.from || m.from > r.to ->
+            (Nothing, [r])
+        | m.from <= r.from && m.to >= r.to ->
+            -- all seeds are mapped
+            (reallyMap r.from r.to, mempty)
+        | m.from <= r.from && m.to < r.to ->
+            -- overlap to the left
+            ( reallyMap r.from m.to
+            , [Range (m.to + 1) r.to]
+            )
+        | m.from <= r.to && m.to >= r.to ->
+            -- overlap to the right
+            ( reallyMap m.from r.to
+            , [Range r.from (m.from - 1)]
+            )
+        | m.from > r.from && m.to < r.to ->
+            -- mapping an inner part only
+            ( reallyMap m.from m.to
+            , [Range r.from (m.from - 1), Range (m.to + 1) r.to]
+            )
+        | True -> error "impossible"
   where
-    reallyMap from to = Just $ mkRange (mappingFunction m from) (mappingFunction m to)
+    reallyMap from to = Just $ Range (mappingFunction m from) (mappingFunction m to)
 
 mapSingleMapping :: [Range] -> Mapping -> [Range]
 mapSingleMapping ranges mapping = go ranges mapping []
