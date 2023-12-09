@@ -1,7 +1,6 @@
 {-# LANGUAGE GHC2021 #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoFieldSelectors #-}
@@ -93,29 +92,28 @@ seedsAndMappings = do
     pure (xs, groups)
 
 mapSingleRow :: Range -> MappingRow -> (Maybe Range, [Range])
-mapSingleRow r m =
-    if
-        | m.to < r.from || m.from > r.to ->
-            (Nothing, [r])
-        | m.from <= r.from && m.to >= r.to ->
-            -- all seeds are mapped
-            (reallyMap r.from r.to, mempty)
-        | m.from <= r.from && m.to < r.to ->
-            -- overlap to the left
-            ( reallyMap r.from m.to
-            , [Range (m.to + 1) r.to]
-            )
-        | m.from <= r.to && m.to >= r.to ->
-            -- overlap to the right
-            ( reallyMap m.from r.to
-            , [Range r.from (m.from - 1)]
-            )
-        | m.from > r.from && m.to < r.to ->
-            -- mapping an inner part only
-            ( reallyMap m.from m.to
-            , [Range r.from (m.from - 1), Range (m.to + 1) r.to]
-            )
-        | True -> error "impossible"
+mapSingleRow r@Range{from = a, to = b} m@MappingRow{from = x, to = y}
+    | y < a || x > b =
+        (Nothing, [r])
+    | x <= a && y >= b =
+        -- all seeds are mapped
+        (reallyMap a b, mempty)
+    | x <= a && y < b =
+        -- overlap to the left
+        ( reallyMap a y
+        , [Range (y + 1) b]
+        )
+    | x <= b && y >= b =
+        -- overlap to the right
+        ( reallyMap x b
+        , [Range a (x - 1)]
+        )
+    | x > a && y < b =
+        -- mapping an inner part only
+        ( reallyMap x y
+        , [Range a (x - 1), Range (y + 1) b]
+        )
+    | otherwise = error "impossible"
   where
     reallyMap from to = Just $ Range (mappingFunction m from) (mappingFunction m to)
 
