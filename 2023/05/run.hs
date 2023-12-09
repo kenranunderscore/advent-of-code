@@ -15,12 +15,17 @@ import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import Data.Text.IO qualified as T
 import Debug.Trace
+import GHC.Generics (Generic)
+import Test.QuickCheck qualified as QC
 
 data SeedRange = SeedRange
     { from :: Integer
     , to :: Integer
     }
-    deriving stock (Show)
+    deriving stock (Show, Eq, Generic)
+
+instance QC.Arbitrary SeedRange where
+    arbitrary = SeedRange <$> QC.arbitrary <*> QC.arbitrary
 
 seeds :: Parser [SeedRange]
 seeds = do
@@ -38,7 +43,10 @@ data Mapping = Mapping
     , from :: Integer
     , to :: Integer
     }
-    deriving (Show)
+    deriving stock (Show, Eq, Generic)
+
+instance QC.Arbitrary Mapping where
+    arbitrary = Mapping <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
 
 mappingFunction :: Mapping -> Integer -> Integer
 mappingFunction m i = i + m.dest - m.from
@@ -118,6 +126,17 @@ applySingleMapping m s =
         | True -> error "forgotten case?"
   where
     reallyMap from to = SeedRange (mappingFunction m from) (mappingFunction m to)
+
+seedCount :: SeedRange -> Integer
+seedCount s = s.to - s.from + 1
+
+prop_applySingleMappingKeepNumberOfSeedsFixed :: (Mapping, SeedRange) -> Bool
+prop_applySingleMappingKeepNumberOfSeedsFixed (m, s) =
+    let res = applySingleMapping m s
+    in case res of
+        Nothing -> True
+        Just (mapped, unmapped) ->
+            seedCount mapped + sum (fmap seedCount unmapped) == seedCount s
 
 part1 :: Text -> Integer
 part1 input = do
