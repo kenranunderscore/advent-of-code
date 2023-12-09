@@ -92,75 +92,75 @@ seedsAndMappings = do
     groups <- many1' group
     pure (xs, groups)
 
-applyMappingRow :: MappingRow -> Range -> Maybe (Range, [Range])
-applyMappingRow m s
+-- suuuuuper redundant because I (thought I) had an error in the first version
+-- and then had to make it obvious
+mapSingleRow :: Range -> MappingRow -> (Maybe Range, [Range])
+mapSingleRow s m
     | m.from < s.from =
         if
             | m.to < s.from ->
-                Nothing
+                (Nothing, [s])
             | m.to < s.to ->
                 -- left part of range only
-                Just (reallyMap s.from m.to, [mkRange (m.to + 1) s.to])
+                (reallyMap s.from m.to, [mkRange (m.to + 1) s.to])
             | True ->
                 -- whole range is mapped
-                Just (reallyMap s.from s.to, mempty)
+                (reallyMap s.from s.to, mempty)
     | m.from == s.from =
         if
             | m.to < s.to ->
-                Just (reallyMap m.from m.to, [mkRange (m.to + 1) s.to])
+                (reallyMap m.from m.to, [mkRange (m.to + 1) s.to])
             | True ->
                 -- whole range is mapped
-                Just (reallyMap s.from s.to, mempty)
+                (reallyMap s.from s.to, mempty)
     | m.from < s.to =
         if
             | m.to < s.to ->
                 -- mapping fully contained -> two unmapped ranges
-                Just (reallyMap m.from m.to, [mkRange s.from (m.from - 1), mkRange (m.to + 1) s.to])
+                (reallyMap m.from m.to, [mkRange s.from (m.from - 1), mkRange (m.to + 1) s.to])
             | True ->
-                Just (reallyMap m.from s.to, [mkRange s.from (m.from - 1)])
+                (reallyMap m.from s.to, [mkRange s.from (m.from - 1)])
     | m.from == s.to =
-        Just (reallyMap s.to s.to, [mkRange s.from (s.to - 1)])
+        (reallyMap s.to s.to, [mkRange s.from (s.to - 1)])
     | m.from > s.to =
-        Nothing
+        (Nothing, [s])
     | otherwise =
         error "impossible m.from"
   where
-    reallyMap from to = mkRange (mappingFunction m from) (mappingFunction m to)
+    reallyMap from to = Just $ mkRange (mappingFunction m from) (mappingFunction m to)
 
-applyGroup :: Mapping -> Range -> [Range]
-applyGroup mg s =
-    go mg [] [s]
+mapSingleMapping :: [Range] -> Mapping -> [Range]
+mapSingleMapping ranges mapping = go ranges mapping []
   where
-    go _ acc [] = acc
-    go group acc rs@(r : remainingRanges) =
-        case group of
-            [] -> rs <> acc
-            (m : rest) ->
-                case applyMappingRow m r of
-                    Nothing -> go rest acc rs
-                    Just (mapped, unmapped) ->
-                        go rest (mapped : acc) (remainingRanges <> unmapped)
+    -- acc contains the already mapped ranges
+    -- no rows or ranges left, we're done
+    go rs [] acc = acc <> rs
+    go [] _ acc = acc
+    go rs (m : ms) acc =
+        let
+            results = fmap (`mapSingleRow` m) rs
+            unmapped = concatMap snd results
+            mapped = mapMaybe fst results
+            remaining = rs <> unmapped
+        in
+            go unmapped ms (mapped <> acc)
 
-applyGroups :: [Mapping] -> [Range] -> [Range]
-applyGroups groups ranges =
-    foldl'
-        (\prev mg -> concatMap (applyGroup mg) prev)
-        ranges
-        groups
+mapRanges :: [Range] -> [Mapping] -> [Range]
+mapRanges = foldl' mapSingleMapping
 
 part1 :: Text -> Integer
 part1 input = do
     let
-        Right (seedRanges, groups) = parseOnly seedsAndMappings input
-        singleSeeds = concatMap (\s -> [mkRange s.from s.from, mkRange (rangeLength s) (rangeLength s)]) seedRanges
-        res = applyGroups groups singleSeeds
+        Right (ranges, mappings) = parseOnly seedsAndMappings input
+        singleSeeds = concatMap (\s -> [mkRange s.from s.from, mkRange (rangeLength s) (rangeLength s)]) ranges
+        res = mapRanges singleSeeds mappings
     minimum $ fmap (.from) res
 
 part2 :: Text -> Integer
 part2 input = do
     let
-        Right (seedRanges, groups) = parseOnly seedsAndMappings input
-        res = traceShowId $! sort $ applyGroups groups seedRanges
+        Right (ranges, mappings) = parseOnly seedsAndMappings input
+        res = traceShowId $! mapRanges ranges mappings
     minimum $ fmap (.from) res
 
 main :: IO ()
@@ -169,20 +169,12 @@ main = do
     print $ part1 input
     print $ part2 input
 
-prop_applyMappingRowKeepsNumberOfSeedsFixed :: (MappingRow, Range) -> Bool
-prop_applyMappingRowKeepsNumberOfSeedsFixed (m, s) =
-    let res = applyMappingRow m s
+prop_mapSingleRowKeepsNumberOfSeedsFixed :: (MappingRow, Range) -> Bool
+prop_mapSingleRowKeepsNumberOfSeedsFixed (m, s) =
+    let res = mapSingleRow s m
     in case res of
-        Nothing -> True
-        Just (mapped, unmapped) ->
-            rangeLength mapped + sum (fmap rangeLength unmapped) == rangeLength s
-
-prop_applyGroupsKeepsNumberOfSeedsFixed :: ([Mapping], [Range]) -> Bool
-prop_applyGroupsKeepsNumberOfSeedsFixed (groups, ranges) =
-    let res = applyGroups groups ranges
-    in sum (fmap rangeLength res) == sum (fmap rangeLength ranges)
-
-prop_applyGroupKeepsNumberOfSeedsFixed :: (Mapping, Range) -> Bool
-prop_applyGroupKeepsNumberOfSeedsFixed (mg, s) =
-    let res = applyGroup mg s
-    in sum (fmap rangeLength res) == rangeLength s
+        (Nothing, unmapped) -> sum (fmap rangeLength unmapped) == len
+        (Just mapped, unmapped) ->
+            rangeLength mapped + sum (fmap rangeLength unmapped) == len
+  where
+    len = rangeLength s
