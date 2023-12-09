@@ -1,7 +1,6 @@
 {-# LANGUAGE GHC2021 #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -19,65 +18,63 @@ import Debug.Trace
 import GHC.Generics (Generic)
 import Test.QuickCheck qualified as QC
 
-data SeedRange = SeedRange
+data Range = Range
     { from :: Integer
     , to :: Integer
     }
     deriving stock (Eq, Generic)
 
-mkSeedRange :: Integer -> Integer -> SeedRange
-mkSeedRange from to =
+mkRange :: Integer -> Integer -> Range
+mkRange from to =
     if from > to
         then error $ "invalid range: " <> show (from, to)
-        else SeedRange{from, to}
+        else Range{from, to}
 
-instance Show SeedRange where
-    show s = "[" <> show s.from <> ".." <> show s.to <> "]"
+instance Show Range where
+    show s = " [" <> show s.from <> " .. " <> show s.to <> "] "
 
-instance Ord SeedRange where
+instance Ord Range where
     s <= s' = s.from <= s'.from
 
-instance QC.Arbitrary SeedRange where
+instance QC.Arbitrary Range where
     arbitrary = do
         QC.NonNegative from <- QC.arbitrary
         QC.NonNegative offset <- QC.arbitrary
-        pure $ SeedRange{from, to = from + offset}
+        pure $ Range{from, to = from + offset}
 
-seedCount :: SeedRange -> Integer
-seedCount s = s.to - s.from + 1
+rangeLength :: Range -> Integer
+rangeLength s = s.to - s.from + 1
 
-data Mapping = Mapping
+data MappingRow = MappingRow
     { dest :: Integer
     , from :: Integer
     , to :: Integer
     }
     deriving stock (Show, Eq, Generic)
 
-instance QC.Arbitrary Mapping where
+instance QC.Arbitrary MappingRow where
     arbitrary = do
         QC.NonNegative dest <- QC.arbitrary
         QC.NonNegative from <- QC.arbitrary
         QC.NonNegative offset <- QC.arbitrary
-        pure $ Mapping{dest, from, to = from + offset}
+        pure $ MappingRow{dest, from, to = from + offset}
 
-mappingFunction :: Mapping -> Integer -> Integer
+mappingFunction :: MappingRow -> Integer -> Integer
 mappingFunction m i = i + m.dest - m.from
 
-type MappingGroup = [Mapping]
+type Mapping = [MappingRow]
 
-seeds :: Parser [SeedRange]
-seeds = do
-    string "seeds:"
-    many1' seedRange
+seeds :: Parser [Range]
+seeds = "seeds:" *> many1' seedRange
   where
     seed = char ' ' *> decimal
     seedRange = do
         from <- seed
         len <- seed
-        pure $ mkSeedRange from (from + len - 1)
+        pure $ mkRange from (from + len - 1)
 
-mappingGroup :: Parser MappingGroup
-mappingGroup = do
+mapping :: Parser Mapping
+mapping = do
     skipWhile (not . isDigit)
     many1' (range <* char '\n')
   where
@@ -85,32 +82,32 @@ mappingGroup = do
         dest <- decimal
         from <- char ' ' *> decimal
         len <- char ' ' *> decimal
-        pure $ Mapping dest from (from + len - 1)
+        pure $ MappingRow dest from (from + len - 1)
 
-seedsAndMappings :: Parser ([SeedRange], [MappingGroup])
+seedsAndMappings :: Parser ([Range], [Mapping])
 seedsAndMappings = do
-    let group = char '\n' *> mappingGroup
+    let group = char '\n' *> mapping
     xs <- seeds
     char '\n'
     groups <- many1' group
     pure (xs, groups)
 
-applySingleMapping :: Mapping -> SeedRange -> Maybe (SeedRange, [SeedRange])
-applySingleMapping m s
+applyMappingRow :: MappingRow -> Range -> Maybe (Range, [Range])
+applyMappingRow m s
     | m.from < s.from =
         if
             | m.to < s.from ->
                 Nothing
             | m.to < s.to ->
                 -- left part of range only
-                Just (reallyMap s.from m.to, [mkSeedRange (m.to + 1) s.to])
+                Just (reallyMap s.from m.to, [mkRange (m.to + 1) s.to])
             | True ->
                 -- whole range is mapped
                 Just (reallyMap s.from s.to, mempty)
     | m.from == s.from =
         if
             | m.to < s.to ->
-                Just (reallyMap m.from m.to, [mkSeedRange (m.to + 1) s.to])
+                Just (reallyMap m.from m.to, [mkRange (m.to + 1) s.to])
             | True ->
                 -- whole range is mapped
                 Just (reallyMap s.from s.to, mempty)
@@ -118,19 +115,19 @@ applySingleMapping m s
         if
             | m.to < s.to ->
                 -- mapping fully contained -> two unmapped ranges
-                Just (reallyMap m.from m.to, [mkSeedRange s.from (m.from - 1), mkSeedRange (m.to + 1) s.to])
+                Just (reallyMap m.from m.to, [mkRange s.from (m.from - 1), mkRange (m.to + 1) s.to])
             | True ->
-                Just (reallyMap m.from s.to, [mkSeedRange s.from (m.from - 1)])
+                Just (reallyMap m.from s.to, [mkRange s.from (m.from - 1)])
     | m.from == s.to =
-        Just (reallyMap s.to s.to, [mkSeedRange s.from (s.to - 1)])
+        Just (reallyMap s.to s.to, [mkRange s.from (s.to - 1)])
     | m.from > s.to =
         Nothing
-    | True =
+    | otherwise =
         error "impossible m.from"
   where
-    reallyMap from to = mkSeedRange (mappingFunction m from) (mappingFunction m to)
+    reallyMap from to = mkRange (mappingFunction m from) (mappingFunction m to)
 
-applyGroup :: MappingGroup -> SeedRange -> [SeedRange]
+applyGroup :: Mapping -> Range -> [Range]
 applyGroup mg s =
     go mg [] [s]
   where
@@ -139,12 +136,12 @@ applyGroup mg s =
         case group of
             [] -> rs <> acc
             (m : rest) ->
-                case applySingleMapping m r of
+                case applyMappingRow m r of
                     Nothing -> go rest acc rs
                     Just (mapped, unmapped) ->
                         go rest (mapped : acc) (remainingRanges <> unmapped)
 
-applyGroups :: [MappingGroup] -> [SeedRange] -> [SeedRange]
+applyGroups :: [Mapping] -> [Range] -> [Range]
 applyGroups groups ranges =
     foldl'
         (\prev mg -> concatMap (applyGroup mg) prev)
@@ -155,7 +152,7 @@ part1 :: Text -> Integer
 part1 input = do
     let
         Right (seedRanges, groups) = parseOnly seedsAndMappings input
-        singleSeeds = concatMap (\s -> [mkSeedRange s.from s.from, mkSeedRange (seedCount s) (seedCount s)]) seedRanges
+        singleSeeds = concatMap (\s -> [mkRange s.from s.from, mkRange (rangeLength s) (rangeLength s)]) seedRanges
         res = applyGroups groups singleSeeds
     minimum $ fmap (.from) res
 
@@ -172,20 +169,20 @@ main = do
     print $ part1 input
     print $ part2 input
 
-prop_applySingleMappingKeepsNumberOfSeedsFixed :: (Mapping, SeedRange) -> Bool
-prop_applySingleMappingKeepsNumberOfSeedsFixed (m, s) =
-    let res = applySingleMapping m s
+prop_applyMappingRowKeepsNumberOfSeedsFixed :: (MappingRow, Range) -> Bool
+prop_applyMappingRowKeepsNumberOfSeedsFixed (m, s) =
+    let res = applyMappingRow m s
     in case res of
         Nothing -> True
         Just (mapped, unmapped) ->
-            seedCount mapped + sum (fmap seedCount unmapped) == seedCount s
+            rangeLength mapped + sum (fmap rangeLength unmapped) == rangeLength s
 
-prop_applyGroupsKeepsNumberOfSeedsFixed :: ([MappingGroup], [SeedRange]) -> Bool
+prop_applyGroupsKeepsNumberOfSeedsFixed :: ([Mapping], [Range]) -> Bool
 prop_applyGroupsKeepsNumberOfSeedsFixed (groups, ranges) =
     let res = applyGroups groups ranges
-    in sum (fmap seedCount res) == sum (fmap seedCount ranges)
+    in sum (fmap rangeLength res) == sum (fmap rangeLength ranges)
 
-prop_applyGroupKeepsNumberOfSeedsFixed :: (MappingGroup, SeedRange) -> Bool
+prop_applyGroupKeepsNumberOfSeedsFixed :: (Mapping, Range) -> Bool
 prop_applyGroupKeepsNumberOfSeedsFixed (mg, s) =
     let res = applyGroup mg s
-    in sum (fmap seedCount res) == seedCount s
+    in sum (fmap rangeLength res) == rangeLength s
