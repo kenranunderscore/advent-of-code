@@ -1,98 +1,141 @@
 {-# LANGUAGE GHC2021 #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
+import Control.Applicative
 import Data.Attoparsec.Text
+import Data.Char (isDigit)
 import Data.Foldable (foldl')
 import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import Data.Text.IO qualified as T
+import Debug.Trace
 
-type Seeds = [Int]
+data SeedRange = SeedRange
+    { from :: Integer
+    , to :: Integer
+    }
+    deriving stock (Show)
 
-seeds :: Parser Seeds
+seeds :: Parser [SeedRange]
 seeds = do
     string "seeds:"
-    many' seed
+    many1' seedRange
   where
     seed = char ' ' *> decimal
+    seedRange = do
+        from <- seed
+        len <- seed
+        pure $ SeedRange from (from + len - 1)
 
-data Range = Range
-    { dest :: Int
-    , from :: Int
-    , length :: Int
+data Mapping = Mapping
+    { dest :: Integer
+    , from :: Integer
+    , to :: Integer
     }
     deriving (Show)
 
-ranges :: Text -> Parser [Range]
-ranges name = do
-    string name <* string " map:\n"
-    many' (range <* char '\n')
+mappingFunction :: Mapping -> Integer -> Integer
+mappingFunction m i = i + m.dest - m.from
+
+type MappingGroup = [Mapping]
+
+mappingGroup :: Parser MappingGroup
+mappingGroup = do
+    skipWhile (not . isDigit)
+    many1' (range <* char '\n')
   where
-    range = Range <$> decimal <*> (char ' ' *> decimal) <*> (char ' ' *> decimal)
+    range = do
+        dest <- decimal
+        from <- char ' ' *> decimal
+        len <- char ' ' *> decimal
+        pure $ Mapping dest from (from + len - 1)
 
-type Ranges = [Range]
-
-type Mapping = Ranges
-
-mapping :: Text -> Parser Mapping
-mapping = ranges
-
-seedsAndMappings :: Parser (Seeds, [Mapping])
+seedsAndMappings :: Parser ([SeedRange], [MappingGroup])
 seedsAndMappings = do
+    let group = char '\n' *> mappingGroup
     xs <- seeds
-    char '\n' *> char '\n'
-    seedToSoil <- mapping "seed-to-soil"
     char '\n'
-    soilToFertilizer <- mapping "soil-to-fertilizer"
-    char '\n'
-    fertilizerToWater <- mapping "fertilizer-to-water"
-    char '\n'
-    waterToLight <- mapping "water-to-light"
-    char '\n'
-    lightToTemperature <- mapping "light-to-temperature"
-    char '\n'
-    temperatureToHumidity <- mapping "temperature-to-humidity"
-    char '\n'
-    humidityToLocation <- mapping "humidity-to-location"
-    pure
-        ( xs
-        ,
-            [ seedToSoil
-            , soilToFertilizer
-            , fertilizerToWater
-            , waterToLight
-            , lightToTemperature
-            , temperatureToHumidity
-            , humidityToLocation
-            ]
-        )
+    groups <- many1' group
+    pure (xs, groups)
 
-mapSeed :: [Mapping] -> Int -> Int
-mapSeed ms s =
+applyGroups :: [MappingGroup] -> SeedRange -> [SeedRange]
+applyGroups groups s =
     foldl'
-        ( \i rs ->
-            case mapMaybe (applyRange i) rs of
-                [] -> i
-                [res] -> res
-                _ -> error "whyyy"
+        ( \prev mg ->
+            let x = concatMap (applyGroup mg) prev
+            in -- trace ("    after group: " <> show x) x
+               x
         )
-        s
-        ms
+        [s]
+        groups
 
-applyRange :: Int -> Range -> Maybe Int
-applyRange i r =
-    if r.from <= i && i < r.from + r.length
-        then Just $ i + r.dest - r.from
-        else Nothing
+applyGroup :: MappingGroup -> SeedRange -> [SeedRange]
+applyGroup mg s =
+    go mg [] [s]
+  where
+    go _ acc [] = acc
+    go group acc rs@(r : remainingRanges) =
+        case group of
+            [] -> rs <> acc
+            (m : rest) ->
+                case applySingleMapping m r of
+                    Nothing -> go rest acc rs
+                    Just (mapped, unmapped) ->
+                        go rest (mapped : acc) (remainingRanges <> unmapped)
 
-part1 :: Text -> Int
+applySingleMapping :: Mapping -> SeedRange -> Maybe (SeedRange, [SeedRange])
+applySingleMapping m s =
+    if
+        | m.to < s.from || m.from > s.to ->
+            Nothing
+        | m.from <= s.from && m.to >= s.to ->
+            -- all seeds are mapped
+            Just (reallyMap s.from s.to, mempty)
+        | m.from <= s.from && m.to < s.to ->
+            -- overlap to the left
+            Just
+                ( reallyMap s.from m.to
+                , [SeedRange (m.to + 1) s.to]
+                )
+        | m.from <= s.to && m.to >= s.to ->
+            -- overlap to the right
+            Just
+                ( reallyMap m.from s.to
+                , [SeedRange s.from (m.from - 1)]
+                )
+        | m.from > s.from && m.to < s.to ->
+            -- mapping an inner part only
+            Just
+                ( reallyMap m.from m.to
+                , [SeedRange s.from (m.from - 1), SeedRange (m.to + 1) s.to]
+                )
+        | True -> error "forgotten case?"
+  where
+    reallyMap from to = SeedRange (mappingFunction m from) (mappingFunction m to)
+
+part1 :: Text -> Integer
 part1 input = do
-    let Right (s, ms) = parseOnly seedsAndMappings input
-    minimum $ fmap (mapSeed ms) s
+    let
+        Right (seedRanges, groups) = parseOnly seedsAndMappings input
+        singleSeeds = concatMap (\s -> [SeedRange s.from s.from, SeedRange s.to s.to]) seedRanges
+        res = traceShowId $! concatMap (applyGroups groups) singleSeeds
+    minimum $ fmap (.from) res
+
+part2 :: Text -> Integer
+part2 input = do
+    let
+        Right (seedRanges, groups) = parseOnly seedsAndMappings input
+        res = traceShowId $! concatMap (applyGroups groups) seedRanges
+    minimum $ fmap (.from) res
 
 main :: IO ()
 main = do
     input <- T.readFile "input"
     print $ part1 input
+    print $ part2 input
