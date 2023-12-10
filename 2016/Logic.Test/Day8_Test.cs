@@ -1,8 +1,7 @@
-﻿namespace Tests
+﻿namespace Logic.Test
 {
     using Logic.Day8;
     using NUnit.Framework;
-    using Tests.Inputs;
 
     [TestFixture]
     public class Day8_Test

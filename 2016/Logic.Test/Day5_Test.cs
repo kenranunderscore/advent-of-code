@@ -1,4 +1,4 @@
-﻿namespace Tests
+﻿namespace Logic.Test
 {
     using Logic.Day5;
     using NUnit.Framework;

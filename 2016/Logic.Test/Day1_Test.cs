@@ -1,4 +1,4 @@
-﻿namespace Tests
+﻿namespace Logic.Test
 {
     using Logic;
     using Logic.Day1;

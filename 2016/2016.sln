@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{956B58F3-4B8E-4EB2-A4AD-9974437C2F1A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Logic", "Logic\Logic.csproj", "{ABA89C6E-CA63-44DF-9D85-ABA185AE6AC2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Logic.Test", "Logic.Test\Logic.Test.csproj", "{45657774-57F2-4710-9164-19A4FCFFC12A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ABA89C6E-CA63-44DF-9D85-ABA185AE6AC2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ABA89C6E-CA63-44DF-9D85-ABA185AE6AC2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ABA89C6E-CA63-44DF-9D85-ABA185AE6AC2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ABA89C6E-CA63-44DF-9D85-ABA185AE6AC2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45657774-57F2-4710-9164-19A4FCFFC12A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45657774-57F2-4710-9164-19A4FCFFC12A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45657774-57F2-4710-9164-19A4FCFFC12A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45657774-57F2-4710-9164-19A4FCFFC12A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{ABA89C6E-CA63-44DF-9D85-ABA185AE6AC2} = {956B58F3-4B8E-4EB2-A4AD-9974437C2F1A}
+		{45657774-57F2-4710-9164-19A4FCFFC12A} = {956B58F3-4B8E-4EB2-A4AD-9974437C2F1A}
+	EndGlobalSection
+EndGlobal

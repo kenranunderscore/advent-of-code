@@ -1,4 +1,4 @@
-﻿namespace Tests.Inputs
+﻿namespace Logic.Test
 {
     using System.Collections.Generic;
     using System.IO;
@@ -6,7 +6,7 @@
 
     public static class Utils
     {
-        private const string FolderPrefix = "Tests.Inputs.";
+        private const string FolderPrefix = "Logic.Test.Inputs.";
 
         public static IEnumerable<string> ReadLines(string resourceName)
         {
