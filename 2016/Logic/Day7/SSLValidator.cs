@@ -1,44 +1,43 @@
-﻿namespace Logic.Day7
+﻿namespace Logic.Day7;
+
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+
+public class SSLValidator
 {
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text.RegularExpressions;
+    private static readonly Regex bracketContentRegex = new Regex(@"\[(\w+)\]", RegexOptions.IgnoreCase);
 
-    public class SSLValidator
+    public bool SupportsSSL(string sequence)
     {
-        private static readonly Regex bracketContentRegex = new Regex(@"\[(\w+)\]", RegexOptions.IgnoreCase);
+        var abas = ExtractABAs(sequence);
 
-        public bool SupportsSSL(string sequence)
+        foreach (string aba in abas)
         {
-            var abas = ExtractABAs(sequence);
-
-            foreach (string aba in abas)
+            string bab = new string(new[] { aba[1], aba[0], aba[1] });
+            foreach (var match in bracketContentRegex.Matches(sequence).Cast<Match>())
             {
-                string bab = new string(new[] { aba[1], aba[0], aba[1] });
-                foreach (var match in bracketContentRegex.Matches(sequence).Cast<Match>())
-                {
-                    if (match.Groups[1].Value.Contains(bab))
-                        return true;
-                }
+                if (match.Groups[1].Value.Contains(bab))
+                    return true;
             }
-
-            return false;
         }
 
-        private static IReadOnlyCollection<string> ExtractABAs(string val)
-        {
-            var abas = new List<string>();
-            foreach (string s in val.Split('[', ']').Where((s, i) => i % 2 == 0))
-            {
-                for (int i = 0; i <= s.Length - 3; i++)
-                {
-                    string str = s.Substring(i, 3);
-                    if (str[0] != str[1] && str[0] == str[2])
-                        abas.Add(str);
-                }
-            }
+        return false;
+    }
 
-            return abas;
+    private static IReadOnlyCollection<string> ExtractABAs(string val)
+    {
+        var abas = new List<string>();
+        foreach (string s in val.Split('[', ']').Where((s, i) => i % 2 == 0))
+        {
+            for (int i = 0; i <= s.Length - 3; i++)
+            {
+                string str = s.Substring(i, 3);
+                if (str[0] != str[1] && str[0] == str[2])
+                    abas.Add(str);
+            }
         }
+
+        return abas;
     }
 }
