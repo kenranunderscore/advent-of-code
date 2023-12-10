@@ -5,6 +5,11 @@ using System.Text.RegularExpressions;
 
 public class AssembunnyInterpreter
 {
+    public AssembunnyInterpreter(IEnumerable<string> input)
+    {
+        this.Input = input.ToList();
+    }
+
     private static readonly Regex reg = new Regex(
         @"(cpy ((?<cpy_source_r>[a-d])|(?<cpy_source_n>\-?\d+)) (?<cpy_r>[a-d])|inc (?<inc_r>[a-d])|dec (?<dec_r>[a-d])|jnz ((?<jnz_r>[a-d])|(?<jnz_v>\-?\d+)) (?<jnz_n>\-?\d+))");
 
@@ -19,7 +24,7 @@ public class AssembunnyInterpreter
 
     public IDictionary<string, int> Registers => registers;
 
-    public IReadOnlyList<string> Input { get; set; }
+    public IReadOnlyList<string> Input { get; }
 
     public void Run()
     {
