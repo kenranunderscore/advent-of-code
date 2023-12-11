@@ -67,8 +67,7 @@ beatsRecord race secondsHeld =
     in distance > race.record
 
 part1 :: [Race] -> Int
-part1 rs =
-    product $ fmap strategies rs
+part1 = product . fmap strategies
 
 strategies :: Race -> Int
 strategies race = length $ filter (beatsRecord race) [1 .. race.duration - 1]
