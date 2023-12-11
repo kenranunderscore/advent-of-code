@@ -32,19 +32,13 @@ toMatrix = V.fromList . fmap V.fromList
 instance Show Universe where
     show (Universe m) = List.intercalate "\n" $ fromMatrix m
 
-expand :: Universe -> Universe
-expand u =
-    u.value
-        & fromMatrix
-        & duplicateEmptyRows
-        & List.transpose
-        & duplicateEmptyRows
-        & List.transpose
-        & toMatrix
-        & Universe
-  where
-    isEmpty = all (== '.')
-    duplicateEmptyRows = concatMap (\l -> if isEmpty l then [l, l] else [l])
+emptyRows :: Vector (Vector Char) -> [Int]
+emptyRows u =
+    V.toList $
+        V.imapMaybe (\y r -> if all (== '.') r then Just y else Nothing) u
+
+emptyColumns :: Vector (Vector Char) -> [Int]
+emptyColumns = emptyRows . toMatrix . List.transpose . fromMatrix
 
 type Galaxy = (Int, Int)
 
@@ -53,10 +47,23 @@ galaxies u =
     V.toList . V.concat . V.toList $
         V.imapMaybe
             ( \y row ->
-                let gs = V.imapMaybe (\x c -> if c == '#' then Just (y, x) else Nothing) row
+                let gs =
+                        V.imapMaybe
+                            ( \x c ->
+                                if c == '#'
+                                    then Just (translateRow y, translateColumn x)
+                                    else Nothing
+                            )
+                            row
                 in if V.null gs then Nothing else Just gs
             )
             u.value
+  where
+    rs = emptyRows u.value
+    cs = emptyColumns u.value
+    translateIndex emptyIndices i = i + length (filter (< i) emptyIndices)
+    translateRow = translateIndex rs
+    translateColumn = translateIndex cs
 
 pairings :: [Galaxy] -> [(Galaxy, Galaxy)]
 pairings gs = [(g1, g2) | g1 <- gs, g2 <- gs, g1 > g2]
@@ -65,9 +72,10 @@ shortestPath :: Galaxy -> Galaxy -> Int
 shortestPath (y1, x1) (y2, x2) = abs (y1 - y2) + abs (x1 - x2)
 
 part1 :: Universe -> Int
-part1 = sum . fmap (uncurry shortestPath) . pairings . galaxies . expand
+part1 = sum . fmap (uncurry shortestPath) . pairings . galaxies
 
 main :: IO ()
 main = do
-    universe <- Universe . toMatrix . lines <$> readFile "input"
+    universe <- Universe . toMatrix . lines <$> readFile "example"
+    print $ galaxies universe
     print $ part1 universe
