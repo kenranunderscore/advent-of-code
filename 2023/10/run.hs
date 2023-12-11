@@ -113,9 +113,8 @@ connected' s tb lr tl tr bl br area p@(y, x) p2@(y2, x2)
         (origin == s || origin == lr || origin == tr || origin == br)
             && (t == lr || t == tl || t == bl)
     | y2 == y && x2 == x + 1 =
-        traceShowId $
-            (origin == s || origin == lr || origin == tl || origin == bl)
-                && (t == lr || t == tr || t == br)
+        (origin == s || origin == lr || origin == tl || origin == bl)
+            && (t == lr || t == tr || t == br)
     | y2 == y - 1 && x2 == x =
         (origin == s || origin == bl || origin == br || origin == tb)
             && (t == tb || t == tl || t == tr)
@@ -138,19 +137,20 @@ connectedTiles area pos@(y, x) =
   where
     tiles = [(y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)]
 
-part1 :: Area Tile -> Int
+part1 :: Area Tile -> (Set Pos, Int)
 part1 area =
-    1 + go (Set.singleton (start area)) mempty 0
+    go s mempty s 1
   where
-    go current previous n =
+    s = Set.singleton $ start area
+    go current previous seen n =
         let
             adjacent = mconcat $ Set.toList $ Set.map (connectedTiles area) current
             next = Set.difference adjacent previous
         in
-            if length next == 1 then n else go next current (n + 1)
+            if next `Set.isSubsetOf` seen then (seen, n - 1) else go next current (Set.union seen next) (n + 1)
 
 main :: IO ()
 main = do
     input <- T.readFile "input"
     let Right x = parseOnly area input
-    print $ part1 x
+    print $ snd $ part1 x
