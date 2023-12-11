@@ -5,6 +5,9 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoFieldSelectors #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use bimap" #-}
 
 import Control.Applicative
 import Data.Attoparsec.Text
@@ -22,45 +25,25 @@ import Data.Vector (Vector, (!))
 import Data.Vector qualified as V
 import Debug.Trace
 
-data Tile = TopBottom | LeftRight | BottomLeft | BottomRight | TopLeft | TopRight | Start | Empty
-    deriving stock (Eq)
-
-instance Show Tile where
-    show = \case
-        TopBottom -> "║"
-        LeftRight -> "═"
-        Start -> "S"
-        Empty -> " "
-        TopLeft -> "╔"
-        TopRight -> "╗"
-        BottomLeft -> "╚"
-        BottomRight -> "╝"
-
 newtype Area a = Area {value :: Vector (Vector a)}
-
-instance Show (Area Tile) where
-    show (Area rows) =
-        List.intercalate "\n" (V.toList $ fmap showRow rows)
-      where
-        showRow row = concat $ V.toList $ fmap show row
 
 instance Show (Area Char) where
     show (Area rows) =
         List.intercalate "\n" (V.toList $ fmap V.toList rows)
 
-area :: Parser (Area Tile)
+area :: Parser (Area Char)
 area = do
     Area . V.fromList <$> many1 row
   where
     tile =
-        ("." >> pure Empty)
-            <|> ("S" >> pure Start)
-            <|> ("|" >> pure TopBottom)
-            <|> ("-" >> pure LeftRight)
-            <|> ("L" >> pure BottomLeft)
-            <|> ("J" >> pure BottomRight)
-            <|> ("7" >> pure TopRight)
-            <|> ("F" >> pure TopLeft)
+        char '.'
+            <|> char 'S'
+            <|> char '|'
+            <|> char '-'
+            <|> char 'L'
+            <|> char 'J'
+            <|> char '7'
+            <|> char 'F'
     row = V.fromList <$> (many1' tile <* char '\n')
 
 areaHeight :: Area a -> Int
@@ -84,8 +67,8 @@ start' pred area =
     in
         (y, x)
 
-start :: Area Tile -> Pos
-start = start' (== Start)
+start :: Area Char -> Pos
+start = start' (== 'S')
 
 insideBounds :: Area a -> Pos -> Bool
 insideBounds area (y, x) =
@@ -126,10 +109,10 @@ connected' s tb lr tl tr bl br area p@(y, x) p2@(y2, x2)
     t = tileAt area p2
     origin = tileAt area p
 
-connected :: Area Tile -> Pos -> Pos -> Bool
-connected = connected' Start TopBottom LeftRight TopLeft TopRight BottomLeft BottomRight
+connected :: Area Char -> Pos -> Pos -> Bool
+connected = connected' 'S' '|' '-' 'F' '7' 'L' 'J'
 
-connectedTiles :: Area Tile -> Pos -> Set Pos
+connectedTiles :: Area Char -> Pos -> Set Pos
 connectedTiles area pos@(y, x) =
     tiles
         & filter (connected area pos)
@@ -137,11 +120,11 @@ connectedTiles area pos@(y, x) =
   where
     tiles = [(y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)]
 
-part1 :: Area Tile -> (Set Pos, Int)
-part1 area =
-    go s mempty s 1
+part1 :: Pos -> Area Char -> (Set Pos, Int)
+part1 s area =
+    go s' mempty s' 1
   where
-    s = Set.singleton $ start area
+    s' = Set.singleton s
     go current previous seen n =
         let
             adjacent = mconcat $ Set.toList $ Set.map (connectedTiles area) current
@@ -149,8 +132,72 @@ part1 area =
         in
             if next `Set.isSubsetOf` seen then (seen, n - 1) else go next current (Set.union seen next) (n + 1)
 
+expandArea :: Area Char -> Area Char
+expandArea (Area rows) =
+    Area (V.fromList <$> V.concatMap expandRow rows)
+  where
+    expandRow r =
+        let largerTiles :: Vector [String] = fmap expandTile r
+        in V.fromList [concatMap head largerTiles, concatMap last largerTiles]
+    expandTile = \case
+        '.' -> [". ", "  "]
+        'S' -> ["L-", "  "] -- FIXME
+        '|' -> ["| ", "| "]
+        '-' -> ["--", "  "]
+        'L' -> ["L-", "  "]
+        'J' -> ["J ", "  "]
+        'F' -> ["F-", "| "]
+        '7' -> ["7 ", "| "]
+
+reachableNonLoopNeighbors :: Area Char -> Set Pos -> Pos -> Set Pos
+reachableNonLoopNeighbors area mainLoop (y, x) =
+    [(y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)]
+        & filter (insideBounds area)
+        & filter (`Set.notMember` mainLoop)
+        & Set.fromList
+
+allReachableFields :: Area Char -> Set Pos -> Set Pos -> Set Pos
+allReachableFields area mainLoop =
+    go
+  where
+    go visited =
+        -- the dumbest way possible -> should only recurse on the newly added
+        -- elements
+        let next = Set.union visited $ Set.unions $ Set.map (reachableNonLoopNeighbors area mainLoop) visited
+        in if length next == length visited then visited else go next
+
+part2 :: Area Char -> Int
+part2 area =
+    areaWidth area * areaHeight area
+        - outside
+        - length (fst $ part1 originalStart area)
+  where
+    expanded = expandArea area
+    originalStart = start area
+    newStart = (2 * fst originalStart, 2 * snd originalStart)
+    mainLoop = traceShowId $ fst $ part1 newStart expanded
+    w = areaWidth expanded
+    h = areaHeight expanded
+    isEmpty c = c == ' ' || c == '.'
+    empties = Set.fromList . filter (isEmpty . tileAt expanded)
+    top = [(0, x) | x <- [0 .. w - 1]]
+    bottom = [(h - 1, x) | x <- [0 .. w - 1]]
+    left = [(y, 0) | y <- [0 .. h - 1]]
+    right = [(y, w - 1) | y <- [0 .. h - 1]]
+    outside =
+        [top, bottom, left, right]
+            & fmap empties
+            & Set.unions
+            & allReachableFields expanded mainLoop
+            & Set.filter (\(y, x) -> even y && even x)
+            & Set.map (\(y, x) -> (y `div` 2, x `div` 2)) -- for debugging
+            & traceShowId
+            & length
+
 main :: IO ()
 main = do
     input <- T.readFile "input"
     let Right x = parseOnly area input
-    print $ snd $ part1 x
+    -- print $ snd $ part1 (start x) x
+    print $ expandArea x
+    print $ part2 x
