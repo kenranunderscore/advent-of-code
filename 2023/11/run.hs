@@ -42,8 +42,10 @@ emptyColumns = emptyRows . toMatrix . List.transpose . fromMatrix
 
 type Galaxy = (Int, Int)
 
-galaxies :: Universe -> [Galaxy]
-galaxies u =
+type Scaling = Int
+
+galaxies :: Scaling -> Universe -> [Galaxy]
+galaxies scaling u =
     V.toList . V.concat . V.toList $
         V.imapMaybe
             ( \y row ->
@@ -61,7 +63,7 @@ galaxies u =
   where
     rs = emptyRows u.value
     cs = emptyColumns u.value
-    translateIndex emptyIndices i = i + length (filter (< i) emptyIndices)
+    translateIndex emptyIndices i = i + (scaling - 1) * length (filter (< i) emptyIndices)
     translateRow = translateIndex rs
     translateColumn = translateIndex cs
 
@@ -71,11 +73,17 @@ pairings gs = [(g1, g2) | g1 <- gs, g2 <- gs, g1 > g2]
 shortestPath :: Galaxy -> Galaxy -> Int
 shortestPath (y1, x1) (y2, x2) = abs (y1 - y2) + abs (x1 - x2)
 
+solve :: Scaling -> Universe -> Int
+solve scaling = sum . fmap (uncurry shortestPath) . pairings . galaxies scaling
+
 part1 :: Universe -> Int
-part1 = sum . fmap (uncurry shortestPath) . pairings . galaxies
+part1 = solve 2
+
+part2 :: Universe -> Int
+part2 = solve 1_000_000
 
 main :: IO ()
 main = do
-    universe <- Universe . toMatrix . lines <$> readFile "example"
-    print $ galaxies universe
+    universe <- Universe . toMatrix . lines <$> readFile "input"
     print $ part1 universe
+    print $ part2 universe
