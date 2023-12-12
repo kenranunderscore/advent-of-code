@@ -7,6 +7,7 @@
       myGhc = pkgs.ghc.withPackages (p: [
         p.vector
         p.attoparsec
+        p.async
         p.text
         p.bytestring
         p.containers
