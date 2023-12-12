@@ -12,33 +12,22 @@ import Data.Function ((&))
 import Data.Functor
 import Data.List qualified as List
 import Data.Maybe qualified as Maybe
-import Data.Set (Set)
-import Data.Set qualified as Set
-import Data.Text (Text)
-import Data.Text qualified as T
-import Data.Text.IO qualified as T
-import Data.Vector (Vector, (!))
-import Data.Vector qualified as V
 import Debug.Trace
 
-newtype Universe = Universe {value :: Vector (Vector Char)}
-
-fromMatrix :: Vector (Vector a) -> [[a]]
-fromMatrix = V.toList . fmap V.toList
-
-toMatrix :: [[a]] -> Vector (Vector a)
-toMatrix = V.fromList . fmap V.fromList
+newtype Universe = Universe {value :: [String]}
 
 instance Show Universe where
-    show (Universe m) = List.intercalate "\n" $ fromMatrix m
+    show (Universe m) = List.intercalate "\n" m
 
-emptyRows :: Vector (Vector Char) -> [Int]
+imapMaybe :: (Int -> a -> Maybe b) -> [a] -> [b]
+imapMaybe f = Maybe.catMaybes . zipWith f [0 ..]
+
+emptyRows :: [String] -> [Int]
 emptyRows u =
-    V.toList $
-        V.imapMaybe (\y r -> if all (== '.') r then Just y else Nothing) u
+    imapMaybe (\y r -> if all (== '.') r then Just y else Nothing) u
 
-emptyColumns :: Vector (Vector Char) -> [Int]
-emptyColumns = emptyRows . toMatrix . List.transpose . fromMatrix
+emptyColumns :: [String] -> [Int]
+emptyColumns = emptyRows . List.transpose
 
 type Galaxy = (Int, Int)
 
@@ -46,18 +35,18 @@ type Scaling = Int
 
 galaxies :: Scaling -> Universe -> [Galaxy]
 galaxies scaling u =
-    V.toList . V.concat . V.toList $
-        V.imapMaybe
+    concat $
+        imapMaybe
             ( \y row ->
                 let gs =
-                        V.imapMaybe
+                        imapMaybe
                             ( \x c ->
                                 if c == '#'
                                     then Just (translateRow y, translateColumn x)
                                     else Nothing
                             )
                             row
-                in if V.null gs then Nothing else Just gs
+                in if null gs then Nothing else Just gs
             )
             u.value
   where
@@ -84,6 +73,6 @@ part2 = solve 1_000_000
 
 main :: IO ()
 main = do
-    universe <- Universe . toMatrix . lines <$> readFile "input"
+    universe <- Universe . lines <$> readFile "input"
     print $ part1 universe
     print $ part2 universe
