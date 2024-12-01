@@ -29,5 +29,12 @@ fn main() {
         .zip(rights.iter())
         .map(|(l, r)| (l - r).abs())
         .sum();
-    println!("sum: {sum}");
+    println!("part1: {sum}");
+
+    // hacky part 2
+    let similarity_score: i32 = lefts
+        .iter()
+        .map(|l| l * rights.iter().filter(|r| *r == l).count() as i32)
+        .sum();
+    println!("part2: {similarity_score}");
 }
