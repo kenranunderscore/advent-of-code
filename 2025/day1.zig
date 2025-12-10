@@ -1,4 +1,5 @@
 const std = @import("std");
+const util = @import("util.zig");
 
 const Dir = enum {
     left,
@@ -13,47 +14,34 @@ fn rotateDial(pos: i16, dir: Dir, offset: i16) i16 {
     }
 }
 
-fn countZeroHits() !usize {
+const Context = struct {
+    pos: i16,
+    count: usize,
+};
+
+fn countZeroesCallback(line: []const u8, ctx: *Context) !void {
+    const offset = try std.fmt.parseInt(i16, line[1..], 10);
+    const dir: Dir = if (line[0] == 'L') .left else .right;
+    const new_pos = rotateDial(ctx.pos, dir, offset);
+    ctx.pos = new_pos;
+
+    if (@mod(new_pos, 100) == 0) {
+        ctx.count += 1;
+    }
+}
+
+fn countZeroes() !usize {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    const input = try std.fs.cwd().openFile("input/day1", .{ .mode = .read_only });
-    defer input.close();
-    var buf: [2]u8 = undefined;
-    var reader: std.fs.File.Reader = input.reader(&buf);
+    var ctx = Context{ .pos = 50, .count = 0 };
+    try util.processLines(alloc, "input/day1", &ctx, countZeroesCallback);
 
-    var line = std.Io.Writer.Allocating.init(alloc);
-    defer line.deinit();
-
-    var count: usize = 0;
-    var pos: i16 = 50;
-    var dir: Dir = undefined;
-    while (true) {
-        _ = reader.interface.streamDelimiter(&line.writer, '\n') catch |err| {
-            if (err == error.EndOfStream) break else return err;
-        };
-        _ = reader.interface.toss(1);
-        const l = line.written();
-        const offset = try std.fmt.parseInt(i16, l[1..], 10);
-        if (l[0] == 'L') {
-            dir = .left;
-        } else {
-            dir = .right;
-        }
-        const new_pos = rotateDial(pos, dir, offset);
-        pos = new_pos;
-        if (@mod(new_pos, 100) == 0) {
-            count += 1;
-        }
-        std.debug.print("{d}\n", .{new_pos});
-        line.clearRetainingCapacity();
-    }
-
-    return count;
+    return ctx.count;
 }
 
 test "part 1" {
-    const result = countZeroHits();
+    const result = countZeroes();
     try std.testing.expectEqual(1147, result);
 }
