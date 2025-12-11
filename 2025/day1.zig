@@ -1,11 +1,6 @@
 const std = @import("std");
 const util = @import("util.zig");
 
-const Dir = enum {
-    left,
-    right,
-};
-
 const Context = struct {
     pos: u16,
     count_part1: usize,
