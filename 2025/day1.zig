@@ -45,12 +45,12 @@ fn countZeroesCallback(line: []const u8, ctx: *Context) !void {
     ctx.count_part2 += hits;
 }
 
-fn countZeroes(ctx: *Context) !void {
+fn run(ctx: *Context) !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    try util.processLines(
+    try util.processFile(
         alloc,
         "input/day1",
         ctx,
@@ -58,48 +58,23 @@ fn countZeroes(ctx: *Context) !void {
     );
 }
 
-test "given example" {
-    const equal = std.testing.expectEqual;
-
-    var p, var hits = rotateDial(50, -68);
-    try equal(1, hits);
-    try equal(82, p);
-
-    p, hits = rotateDial(p, -30);
-    try equal(0, hits);
-    try equal(52, p);
-
-    p, hits = rotateDial(p, 48);
-    try equal(1, hits);
-    try equal(0, p);
-
-    p, hits = rotateDial(p, -5);
-    try equal(0, hits);
-    try equal(95, p);
-
-    p, hits = rotateDial(p, 60);
-    try equal(1, hits);
-    try equal(55, p);
-
-    p, hits = rotateDial(p, -55);
-    try equal(1, hits);
-    try equal(0, p);
-
-    p, hits = rotateDial(p, -1);
-    try equal(0, hits);
-    try equal(99, p);
-
-    p, hits = rotateDial(p, -99);
-    try equal(1, hits);
-    try equal(0, p);
-
-    p, hits = rotateDial(p, 14);
-    try equal(0, hits);
-    try equal(14, p);
-
-    p, hits = rotateDial(p, -82);
-    try equal(1, hits);
-    try equal(32, p);
+test "example input" {
+    const lines = &[_][]const u8{
+        "L68",
+        "L30",
+        "R48",
+        "L5",
+        "R60",
+        "L55",
+        "L1",
+        "L99",
+        "R14",
+        "L82",
+    };
+    var ctx = Context{ .pos = 50, .count_part1 = 0, .count_part2 = 0 };
+    try util.processLines(lines, &ctx, countZeroesCallback);
+    try std.testing.expectEqual(32, ctx.pos);
+    try std.testing.expectEqual(6, ctx.count_part2);
 }
 
 test "special case: move left from 0" {
@@ -133,7 +108,7 @@ test "part 1 and 2" {
         .count_part1 = 0,
         .count_part2 = 0,
     };
-    try countZeroes(&ctx);
+    try run(&ctx);
     try std.testing.expectEqual(1147, ctx.count_part1);
     try std.testing.expectEqual(6789, ctx.count_part2);
 }

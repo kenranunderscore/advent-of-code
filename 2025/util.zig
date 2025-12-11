@@ -1,6 +1,16 @@
 const std = @import("std");
 
 pub fn processLines(
+    lines: []const []const u8,
+    ctx: anytype,
+    comptime CallbackFn: fn ([]const u8, @TypeOf(ctx)) anyerror!void,
+) !void {
+    for (lines) |line| {
+        try CallbackFn(line, ctx);
+    }
+}
+
+pub fn processFile(
     alloc: std.mem.Allocator,
     filename: []const u8,
     ctx: anytype,
