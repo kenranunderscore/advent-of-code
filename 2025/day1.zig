@@ -12,17 +12,18 @@ fn rotateDial(pos: u16, offset: i16) struct { u16, usize } {
     const o = @as(i32, offset);
     const new_pos: u16 = @intCast(@mod(p + o, 100));
 
-    var n: i32 = pos;
-    var hits: usize = 0;
-    for (0..@abs(offset)) |_| {
-        n = @mod(if (offset < 0) (n - 1) else n + 1, 100);
-        if (n == 0)
+    var hits: i32 = @divFloor(p + o, 100);
+    if (offset < 0) {
+        if (pos == 0 and new_pos != 0) {
             hits += 1;
+        } else if (pos != 0 and new_pos == 0) {
+            hits -= 1;
+        }
     }
 
     return .{
         new_pos,
-        hits,
+        @intCast(@abs(hits)),
     };
 }
 
