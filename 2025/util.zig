@@ -15,6 +15,7 @@ pub fn processFile(
     filename: []const u8,
     ctx: anytype,
     comptime CallbackFn: fn ([]const u8, @TypeOf(ctx)) anyerror!void,
+    delim: u8,
 ) !void {
     const input = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
     defer input.close();
@@ -25,7 +26,7 @@ pub fn processFile(
     defer line.deinit();
 
     while (true) {
-        _ = reader.interface.streamDelimiter(&line.writer, '\n') catch |err| {
+        _ = reader.interface.streamDelimiter(&line.writer, delim) catch |err| {
             if (err == error.EndOfStream) break else return err;
         };
         _ = reader.interface.toss(1);

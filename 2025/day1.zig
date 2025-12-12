@@ -51,6 +51,7 @@ fn run(ctx: *Context) !void {
         "input/day1",
         ctx,
         countZeroesCallback,
+        '\n',
     );
 }
 
