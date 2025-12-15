@@ -42,12 +42,8 @@ fn countZeroesCallback(line: []const u8, ctx: *Context) !void {
 }
 
 fn run(ctx: *Context) !void {
-    var gpa = std.heap.DebugAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
-
     try util.processFile(
-        alloc,
+        std.testing.allocator,
         "input/day1",
         ctx,
         countZeroesCallback,
