@@ -29,11 +29,46 @@ fn valid(n: u64) !bool {
     return true;
 }
 
+fn validForPart2(n: u64) !bool {
+    const d = digits(n);
+    var group_size: usize = 1;
+    while (group_size < d) {
+        var first: u64 = undefined;
+        var found = true;
+        if (@mod(d, group_size) == 0) {
+            for (0..@divExact(d, group_size)) |i| {
+                const pot_mod = try std.math.powi(u64, 10, d - i * group_size);
+                const pot_div = try std.math.powi(u64, 10, d - (i + 1) * group_size);
+                const group = @divFloor(@mod(n, pot_mod), pot_div);
+                if (i == 0) {
+                    first = group;
+                } else if (first != group) {
+                    found = false;
+                }
+            }
+            if (found) return false;
+        }
+
+        group_size += 1;
+    }
+
+    return true;
+}
+
 fn callback(line: []const u8, ctx: *Context) !void {
     const s, const e = try parseRange(line);
     var i = s;
     while (i <= e) {
         if (!try valid(i)) ctx.sum += i;
+        i += 1;
+    }
+}
+
+fn callbackPart2(line: []const u8, ctx: *Context) !void {
+    const s, const e = try parseRange(line);
+    var i = s;
+    while (i <= e) {
+        if (!try validForPart2(i)) ctx.sum += i;
         i += 1;
     }
 }
@@ -80,4 +115,25 @@ test {
     );
 
     try std.testing.expectEqual(1227775554, ctx.sum);
+}
+
+test "valid part 2" {
+    try std.testing.expect(try validForPart2(12_345_678));
+    try std.testing.expect(!try validForPart2(11));
+    try std.testing.expect(!try validForPart2(151515));
+    try std.testing.expect(try validForPart2(112233));
+    try std.testing.expect(!try validForPart2(2121212121));
+}
+
+test {
+    var ctx = Context{};
+    try util.processFile(
+        std.testing.allocator,
+        "input/day2",
+        &ctx,
+        callbackPart2,
+        ',',
+    );
+
+    try std.testing.expectEqual(76169125915, ctx.sum);
 }
