@@ -57,15 +57,9 @@ test "countNeighbors" {
         lines.deinit(a);
     }
 
-    var buf = try a.alloc(u8, 3);
-    @memcpy(buf, "@.@");
-    try lines.append(a, buf);
-    buf = try a.alloc(u8, 3);
-    @memcpy(buf, ".@@");
-    try lines.append(a, buf);
-    buf = try a.alloc(u8, 3);
-    @memcpy(buf, "@..");
-    try lines.append(a, buf);
+    try lines.append(a, try a.dupe(u8, "@.@"));
+    try lines.append(a, try a.dupe(u8, ".@@"));
+    try lines.append(a, try a.dupe(u8, "@.."));
 
     try std.testing.expectEqual(4, countNeighbors(lines, 1, 1));
     try std.testing.expectEqual(1, countNeighbors(lines, 0, 0));
