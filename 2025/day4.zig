@@ -2,7 +2,7 @@ const std = @import("std");
 const util = @import("util.zig");
 
 fn countNeighbors(
-    lines: std.ArrayList([]const u8),
+    lines: std.ArrayList([]u8),
     x: usize,
     y: usize,
 ) usize {
@@ -22,25 +22,50 @@ fn countNeighbors(
     return count;
 }
 
-fn part1(lines: std.ArrayList([]const u8)) !usize {
-    var count: usize = 0;
+fn part1(lines: std.ArrayList([]u8)) !usize {
+    var accessible: usize = 0;
     for (0..lines.items[0].len) |x| {
         for (0..lines.items.len) |y| {
             if (lines.items[x][y] == '@' and countNeighbors(lines, x, y) < 4) {
-                count += 1;
+                accessible += 1;
             }
         }
     }
-    return count;
+    return accessible;
+}
+
+fn part2(lines: std.ArrayList([]u8)) !usize {
+    var removed: usize = 0;
+    for (0..lines.items[0].len) |x| {
+        for (0..lines.items.len) |y| {
+            if (lines.items[x][y] == '@' and countNeighbors(lines, x, y) < 4) {
+                lines.items[x][y] = '.';
+                removed += 1;
+            }
+        }
+    }
+
+    return removed +
+        if (removed > 0) (try part2(lines)) else 0;
 }
 
 test "countNeighbors" {
     const a = std.testing.allocator;
-    var lines = std.ArrayList([]const u8).empty;
-    defer lines.deinit(a);
-    try lines.append(a, "@.@");
-    try lines.append(a, ".@@");
-    try lines.append(a, "@..");
+    var lines = std.ArrayList([]u8).empty;
+    defer {
+        for (lines.items) |item| a.free(item);
+        lines.deinit(a);
+    }
+
+    var buf = try a.alloc(u8, 3);
+    @memcpy(buf, "@.@");
+    try lines.append(a, buf);
+    buf = try a.alloc(u8, 3);
+    @memcpy(buf, ".@@");
+    try lines.append(a, buf);
+    buf = try a.alloc(u8, 3);
+    @memcpy(buf, "@..");
+    try lines.append(a, buf);
 
     try std.testing.expectEqual(4, countNeighbors(lines, 1, 1));
     try std.testing.expectEqual(1, countNeighbors(lines, 0, 0));
@@ -59,12 +84,20 @@ test {
     defer a.free(buf);
 
     var tokens = std.mem.tokenizeScalar(u8, buf, '\n');
-    var lines = try std.ArrayList([]const u8).initCapacity(a, stat.size);
-    defer lines.deinit(a);
-    while (tokens.next()) |line| {
-        try lines.append(a, line);
+    var lines = try std.ArrayList([]u8).initCapacity(a, stat.size);
+    defer {
+        for (lines.items) |item| a.free(item);
+        lines.deinit(a);
     }
 
-    const result = try part1(lines);
-    try std.testing.expectEqual(1460, result);
+    while (tokens.next()) |line| {
+        const owned = try a.dupe(u8, line);
+        try lines.append(a, owned);
+    }
+
+    const part1_result = try part1(lines);
+    try std.testing.expectEqual(1460, part1_result);
+
+    const part2_result = try part2(lines);
+    try std.testing.expectEqual(9243, part2_result);
 }
