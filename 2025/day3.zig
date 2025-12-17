@@ -31,6 +31,7 @@ fn maxJoltage(line: []const u8, digits: usize) !u64 {
 }
 
 fn callback(line: []const u8, ctx: *Context) !void {
+    if (line.len == 0) return;
     ctx.sum_part1 += @intCast(try maxJoltage(line, 2));
     ctx.sum_part2 += @intCast(try maxJoltage(line, 12));
 }

@@ -34,11 +34,9 @@ pub fn processFile(
         };
 
         const slice = line.written();
-        if (slice.len > 0) {
-            try CallbackFn(slice, ctx);
-            // TODO(Johannes): test this
-            line.clearRetainingCapacity();
-        }
+        try CallbackFn(slice, ctx);
+        // TODO(Johannes): test this
+        line.clearRetainingCapacity();
 
         if (eof) break;
 

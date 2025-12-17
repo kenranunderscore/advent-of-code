@@ -28,6 +28,8 @@ fn rotateDial(pos: u16, offset: i16) struct { u16, usize } {
 }
 
 fn countZeroesCallback(line: []const u8, ctx: *Context) !void {
+    if (line.len == 0) return;
+
     var offset = try std.fmt.parseInt(i16, line[1..], 10);
     if (line[0] == 'L') {
         offset *= -1;
