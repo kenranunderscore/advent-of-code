@@ -1,0 +1,81 @@
+const std = @import("std");
+const util = @import("util.zig");
+
+const Range = struct {
+    start: u64,
+    end: u64,
+};
+
+fn parseRange(line: []const u8) !Range {
+    var it = std.mem.splitScalar(u8, line, '-');
+    const start = try std.fmt.parseInt(u64, it.next().?, 10);
+    const end = try std.fmt.parseInt(u64, it.next().?, 10);
+    return Range{ .start = start, .end = end };
+}
+
+const Context = struct {
+    found: bool = false,
+    ranges: std.ArrayList(Range) = std.ArrayList(Range).empty,
+    numbers: std.ArrayList(u64) = std.ArrayList(u64).empty,
+    alloc: std.mem.Allocator,
+
+    const Self = @This();
+
+    fn init(alloc: std.mem.Allocator) Context {
+        return Context{ .alloc = alloc };
+    }
+
+    fn deinit(self: *Self) void {
+        self.ranges.deinit(self.alloc);
+        self.numbers.deinit(self.alloc);
+    }
+
+    fn appendRange(self: *Self, range: Range) !void {
+        try self.ranges.append(self.alloc, range);
+    }
+
+    fn appendNumber(self: *Self, n: u64) !void {
+        try self.numbers.append(self.alloc, n);
+    }
+};
+
+fn callback(line: []const u8, ctx: *Context) !void {
+    if (!ctx.found and line.len > 0) {
+        try ctx.appendRange(try parseRange(line));
+        return;
+    }
+    if (!ctx.found and line.len == 0) {
+        ctx.found = true;
+        return;
+    }
+    try ctx.appendNumber(try std.fmt.parseInt(u64, line, 10));
+}
+
+fn part1(ranges: std.ArrayList(Range), numbers: std.ArrayList(u64)) usize {
+    var sum: usize = 0;
+    outer: for (numbers.items) |n| {
+        for (ranges.items) |range| {
+            if (n >= range.start and n <= range.end) {
+                sum += 1;
+                continue :outer;
+            }
+        }
+    }
+    return sum;
+}
+
+test {
+    const a = std.testing.allocator;
+    var ctx = Context.init(a);
+    defer ctx.deinit();
+
+    try util.processFile(
+        a,
+        "input/day5",
+        &ctx,
+        callback,
+        '\n',
+    );
+
+    try std.testing.expectEqual(617, part1(ctx.ranges, ctx.numbers));
+}
