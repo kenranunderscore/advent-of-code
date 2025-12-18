@@ -4,6 +4,16 @@ const util = @import("util.zig");
 const Range = struct {
     start: u64,
     end: u64,
+
+    const Self = @This();
+
+    fn contains(self: Self, n: u64) bool {
+        return self.start <= n and n <= self.end;
+    }
+
+    fn leftOf(self: Self, other: Range) bool {
+        return self.left < other.left;
+    }
 };
 
 fn parseRange(line: []const u8) !Range {
@@ -64,6 +74,44 @@ fn part1(ranges: std.ArrayList(Range), numbers: std.ArrayList(u64)) usize {
     return sum;
 }
 
+fn part2(_: std.mem.Allocator, ranges: *std.ArrayList(Range)) !usize {
+    outer: while (true) {
+        for (0..ranges.items.len) |i| {
+            for (i + 1..ranges.items.len) |j| {
+                const r1 = ranges.items[i];
+                const r2 = ranges.items[j];
+
+                if (r1.start >= r2.start and r1.end <= r2.end) {
+                    _ = ranges.orderedRemove(i);
+                    continue :outer;
+                }
+
+                if (r2.start >= r1.start and r2.end <= r1.end) {
+                    _ = ranges.orderedRemove(j);
+                    continue :outer;
+                }
+
+                if (r1.start <= r2.end and r2.start <= r1.end) {
+                    ranges.items[i] = Range{
+                        .start = @min(r1.start, r2.start),
+                        .end = @max(r1.end, r2.end),
+                    };
+                    _ = ranges.orderedRemove(j);
+                    continue :outer;
+                }
+            }
+        }
+
+        break;
+    }
+
+    var sum: usize = 0;
+    for (ranges.items) |range| {
+        sum += range.end - range.start + 1;
+    }
+    return sum;
+}
+
 test {
     const a = std.testing.allocator;
     var ctx = Context.init(a);
@@ -78,4 +126,5 @@ test {
     );
 
     try std.testing.expectEqual(617, part1(ctx.ranges, ctx.numbers));
+    try std.testing.expectEqual(338258295736104, part2(a, &ctx.ranges));
 }
