@@ -36,17 +36,25 @@ fn part1(lines: std.ArrayList([]u8)) !usize {
 
 fn part2(lines: std.ArrayList([]u8)) !usize {
     var removed: usize = 0;
-    for (0..lines.items[0].len) |x| {
-        for (0..lines.items.len) |y| {
-            if (lines.items[x][y] == '@' and countNeighbors(lines, x, y) < 4) {
-                lines.items[x][y] = '.';
-                removed += 1;
+    var x: usize = 0;
+    var y: usize = 0;
+    outer: while (true) {
+        while (x < lines.items[0].len) : (x += 1) {
+            while (y < lines.items.len) : (y += 1) {
+                if (lines.items[x][y] == '@' and countNeighbors(lines, x, y) < 4) {
+                    lines.items[x][y] = '.';
+                    if (x > 0) x -= 1;
+                    if (y > 0) y -= 1;
+                    removed += 1;
+                    continue :outer;
+                }
             }
+            y = 0;
         }
+        break;
     }
 
-    return removed +
-        if (removed > 0) (try part2(lines)) else 0;
+    return removed;
 }
 
 test "countNeighbors" {
