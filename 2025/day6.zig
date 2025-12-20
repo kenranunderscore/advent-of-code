@@ -78,7 +78,92 @@ fn part1(ctx: Context) u64 {
     return res;
 }
 
-test "test input" {
+/// Ok, so I hated this part immediately upon reading it, as it invalidated
+/// basically everything about my previous solution. So behold the biggest hack
+/// I've done in Zig so far.
+fn part2(alloc: std.mem.Allocator) !u64 {
+    const f = try std.fs.cwd().openFile("input/day6", .{ .mode = .read_only });
+    defer f.close();
+
+    var line_writer = std.io.Writer.Allocating.init(alloc);
+    defer line_writer.deinit();
+
+    var buf: [1000]u8 = undefined;
+    var reader = f.reader(&buf);
+
+    var lines = std.ArrayList([]u8).empty;
+    defer {
+        for (lines.items) |line| alloc.free(line);
+        lines.deinit(alloc);
+    }
+
+    var ops: []u8 = undefined;
+    defer alloc.free(ops);
+
+    // Collect all the lines
+    while (true) {
+        var eof = false;
+        _ = reader.interface.streamDelimiter(&line_writer.writer, '\n') catch |err| switch (err) {
+            error.EndOfStream => eof = true,
+            else => return err,
+        };
+
+        const line = try alloc.dupe(u8, line_writer.written());
+        line_writer.clearRetainingCapacity();
+        if (!eof) {
+            try lines.append(alloc, line);
+            _ = reader.interface.toss(1);
+        } else {
+            ops = line;
+            break;
+        }
+    }
+
+    // Build up columns out of the lines
+    const line_length = lines.items[0].len;
+    var columns = try std.ArrayList([]const u8).initCapacity(alloc, line_length);
+    defer {
+        for (columns.items) |col| alloc.free(col);
+        columns.deinit(alloc);
+    }
+
+    for (0..line_length) |x| {
+        var col = try alloc.alloc(u8, lines.items.len);
+        for (0..lines.items.len) |y| {
+            col[y] = lines.items[y][x];
+        }
+        try columns.append(alloc, col);
+    }
+
+    // Go over it *again* and calculate the sums/products and the end result
+    var result: u64 = 0;
+    var group_result: ?u64 = null;
+    var current_op: ?u8 = null;
+
+    for (0..line_length + 1) |x| {
+        if (x == line_length or std.mem.allEqual(u8, columns.items[x], ' ')) {
+            result += group_result.?;
+            current_op = null;
+            continue;
+        }
+
+        const col = std.mem.trim(u8, columns.items[x], &[_]u8{' '});
+        if (current_op == null) {
+            current_op = ops[x];
+            group_result = if (current_op == '+') 0 else 1;
+        }
+
+        const number = try std.fmt.parseInt(u64, col, 10);
+        group_result = if (current_op.? == '+')
+            group_result.? + number
+        else
+            group_result.? * number;
+    }
+
+    return result;
+}
+
+test "test input part 1" {
     const a = std.testing.allocator;
     var ctx = Context.init(a);
     defer ctx.deinit();
@@ -94,11 +179,15 @@ test "test input" {
     try std.testing.expectEqual(4277556, part1(ctx));
 }
 
-test {
+test "part 1" {
     const a = std.testing.allocator;
     var ctx = Context.init(a);
     defer ctx.deinit();
 
     try util.processFile(a, "input/day6", &ctx, callback, '\n');
     try std.testing.expectEqual(5361735137219, part1(ctx));
+}
+
+test "part 2" {
+    try std.testing.expectEqual(11744693538946, try part2(std.testing.allocator));
 }
