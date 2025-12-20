@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) !void {
     const test_all = b.step("test", "Run tests for all AoC days");
     for (1..7) |day| {
         const day_name = try std.fmt.allocPrint(b.allocator, "day{d}", .{day});
-        const path = try std.fmt.allocPrint(b.allocator, "{s}.zig", .{day_name});
+        const path = try std.fmt.allocPrint(b.allocator, "src/{s}.zig", .{day_name});
         const tests = b.addTest(.{
             .root_module = b.createModule(.{
                 .root_source_file = b.path(path),
