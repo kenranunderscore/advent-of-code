@@ -43,12 +43,73 @@ fn part1(ctx: *Context) !usize {
     return result;
 }
 
-test {
+const Pos = struct {
+    x: usize,
+    remaining: usize,
+};
+
+fn timelines(
+    lines: []const []const u8,
+    x: usize,
+    lookup: *std.AutoHashMap(Pos, usize),
+) !usize {
+    if (lines.len == 0)
+        return 1;
+
+    if (lookup.get(Pos{ .x = x, .remaining = lines.len })) |n|
+        return n;
+
+    const c = lines[0][x];
+    const remaining = lines[1..];
+
+    if (c == '^') {
+        return (if (x > 0)
+            try timelines(remaining, x - 1, lookup)
+        else
+            0) +
+            (if (x < lines[0].len - 1)
+                try timelines(remaining, x + 1, lookup)
+            else
+                0);
+    }
+
+    const res = try timelines(remaining, x, lookup);
+    try lookup.put(Pos{ .x = x, .remaining = lines.len }, res);
+    return res;
+}
+
+fn part2(
+    alloc: std.mem.Allocator,
+    lines: []const []const u8,
+) !usize {
+    var lookup = std.AutoHashMap(Pos, usize).init(alloc);
+    defer lookup.deinit();
+
+    for (0..lines[0].len) |x| {
+        if (lines[0][x] == 'S') {
+            return timelines(lines[1..], x, &lookup);
+        }
+    }
+
+    return error.NoStartingPositionFound;
+}
+
+test "part 1" {
     const a = std.testing.allocator;
     var ctx = Context{ .allocator = a };
     defer ctx.deinit();
+
     try util.processFile(a, "input/day7", &ctx, callback, '\n');
-    const res = try part1(&ctx);
-    // for (ctx.lines.items) |l| std.debug.print("{s}\n", .{l});
-    try std.testing.expectEqual(1675, res);
+
+    try std.testing.expectEqual(1675, try part1(&ctx));
+}
+
+test "part 2" {
+    const a = std.testing.allocator;
+    var ctx = Context{ .allocator = a };
+    defer ctx.deinit();
+
+    try util.processFile(a, "input/day7", &ctx, callback, '\n');
+
+    try std.testing.expectEqual(187987920774390, try part2(a, ctx.lines.items));
 }
