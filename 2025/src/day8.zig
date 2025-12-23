@@ -66,7 +66,6 @@ fn distLessThan(_: void, orig: Pair, other: Pair) bool {
     return orig.dist() < other.dist();
 }
 
-// TODO: could also just form n pairs
 fn getOrderedPairs(
     alloc: std.mem.Allocator,
     points: []Point,
@@ -124,7 +123,9 @@ const Circuit = struct {
     }
 };
 
-fn part1(ctx: Context) !usize {
+const Results = struct { part1: usize, part2: usize };
+
+fn run(ctx: Context) !Results {
     var pairs = try getOrderedPairs(ctx.alloc, ctx.points.items);
     defer pairs.deinit(ctx.alloc);
 
@@ -142,32 +143,49 @@ fn part1(ctx: Context) !usize {
         try circuits.append(ctx.alloc, circuit);
     }
 
-    outer: for (0..n) |i| {
-        const pair = pairs.items[i];
-        std.debug.print("\nconnecting {f} and {f}\n", .{ pair.p, pair.q });
+    var i: usize = 0;
+    var part1: usize = undefined;
+    outer: while (i < pairs.items.len) : (i += 1) {
+        if (i == 999) {
+            const l = circuits.items.len;
+            std.sort.heap(Circuit, circuits.items, {}, Circuit.lessThan);
+            part1 = circuits.items[l - 1].points.count() *
+                circuits.items[l - 2].points.count() *
+                circuits.items[l - 3].points.count();
+        }
 
-        var targets: [2]*Circuit = undefined;
+        const pair = pairs.items[i];
+
+        var first: ?*Circuit = null;
         for (0..circuits.items.len) |j| {
             var circuit = &circuits.items[j];
+            // TODO: benchmark checking just once
             if (circuit.contains(pair.p) and circuit.contains(pair.q)) {
-                std.debug.print("  noop\n", .{});
                 continue :outer;
             }
 
-            if (circuit.contains(pair.p)) targets[0] = circuit;
-            if (circuit.contains(pair.q)) targets[1] = circuit;
-        }
+            if (circuit.contains(pair.p) or circuit.contains(pair.q)) {
+                if (first == null) {
+                    first = circuit;
+                    continue;
+                }
 
-        try targets[0].subsume(targets[1]);
+                try first.?.subsume(circuit);
+                _ = circuits.orderedRemove(j);
+
+                if (circuits.items.len == 1) {
+                    return Results{
+                        .part1 = part1,
+                        .part2 = pair.p.x * pair.q.x,
+                    };
+                }
+
+                continue :outer;
+            }
+        }
     }
 
-    std.debug.print("\n\nnumber of circuits: {d}\n", .{circuits.items.len});
-    std.sort.heap(Circuit, circuits.items, {}, Circuit.lessThan);
-
-    const l = circuits.items.len;
-    return circuits.items[l - 1].points.count() *
-        circuits.items[l - 2].points.count() *
-        circuits.items[l - 3].points.count();
+    unreachable;
 }
 
 test "part 1" {
@@ -177,5 +195,7 @@ test "part 1" {
 
     try util.processFile(a, "input/day8", &ctx, callback, '\n');
 
-    try std.testing.expectEqual(129_564, try part1(ctx));
+    const res = try run(ctx);
+    try std.testing.expectEqual(129_564, res.part1);
+    try std.testing.expectEqual(42_047_840, res.part2);
 }
