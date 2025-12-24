@@ -39,4 +39,25 @@ pub fn build(b: *std.Build) !void {
         day_step.dependOn(&run_day_tests.step);
         test_all.dependOn(&run_day_tests.step);
     }
+
+    const day9_mod = b.addModule("day9mod", .{
+        .root_source_file = b.path("src/day9.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const day9 = b.addExecutable(.{
+        .name = "day9",
+        .root_module = day9_mod,
+    });
+    const day9_step = b.step("day9run", "Run day 9");
+    const day9_run_cmd = b.addRunArtifact(day9);
+    day9_run_cmd.step.dependOn(b.getInstallStep());
+    day9_step.dependOn(&day9_run_cmd.step);
+
+    const day9_check = b.addExecutable(.{
+        .name = "day9check",
+        .root_module = day9_mod,
+    });
+    const check = b.step("check", "Check whether the component compiles");
+    check.dependOn(&day9_check.step);
 }
