@@ -33,7 +33,7 @@ pub fn build(b: *std.Build) !void {
 
         const day_step = b.step(
             day_name,
-            try std.fmt.allocPrint(b.allocator, "Run test for day {d}", .{day}),
+            try std.fmt.allocPrint(b.allocator, "Run tests for day {d}", .{day}),
         );
         const run_day_tests = b.addRunArtifact(tests);
         day_step.dependOn(&run_day_tests.step);
