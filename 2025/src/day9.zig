@@ -183,15 +183,22 @@ fn getEdges(
 fn isInside(
     edges: []const Line,
     p: P,
+    cache: *Cache,
 ) bool {
+    const cached = cache.get(p.x, p.y);
+    if (cached != null) return cached.?;
+
     var inside = false;
-
     outer: for (edges) |edge| {
-        if (edge.isVertical() and edge.p.x == p.x and isBetween(p.y, edge.p.y, edge.q.y))
+        if (edge.isVertical() and edge.p.x == p.x and isBetween(p.y, edge.p.y, edge.q.y)) {
+            cache.set(p.x, p.y, true);
             return true;
+        }
 
-        if (edge.isHorizontal() and edge.p.y == p.y and isBetween(p.x, edge.p.x, edge.q.x))
+        if (edge.isHorizontal() and edge.p.y == p.y and isBetween(p.x, edge.p.x, edge.q.x)) {
+            cache.set(p.x, p.y, true);
             return true;
+        }
 
         for (0..p.x) |x| {
             if (edge.isVertical() and @min(edge.p.y, edge.q.y) < p.y and p.y < @max(edge.p.y, edge.q.y) and edge.p.x == x)
@@ -205,6 +212,7 @@ fn isInside(
         }
     }
 
+    cache.set(p.x, p.y, inside);
     return inside;
 }
 
@@ -220,28 +228,32 @@ const example_edges: []const Line = &[_]Line{
 };
 
 test "isInside" {
+    var cache = try Cache.init(std.testing.allocator, 10, 12);
+    defer cache.deinit();
+
     // Inside the true interior
-    try std.testing.expect(isInside(example_edges, P.init(9, 2)));
-    try std.testing.expect(isInside(example_edges, P.init(9, 4)));
-    try std.testing.expect(isInside(example_edges, P.init(5, 4)));
-    try std.testing.expect(isInside(example_edges, P.init(3, 4)));
-    try std.testing.expect(isInside(example_edges, P.init(10, 6)));
-    try std.testing.expect(isInside(example_edges, P.init(8, 3)));
+    try std.testing.expect(isInside(example_edges, P.init(9, 2), &cache));
+    try std.testing.expect(isInside(example_edges, P.init(9, 4), &cache));
+    try std.testing.expect(isInside(example_edges, P.init(5, 4), &cache));
+    try std.testing.expect(isInside(example_edges, P.init(3, 4), &cache));
+    try std.testing.expect(isInside(example_edges, P.init(10, 6), &cache));
+    try std.testing.expect(isInside(example_edges, P.init(8, 3), &cache));
 
     // Points between edge ends
-    try std.testing.expect(isInside(example_edges, P.init(7, 2)));
-    try std.testing.expect(isInside(example_edges, P.init(11, 6)));
-    try std.testing.expect(isInside(example_edges, P.init(6, 5)));
+    try std.testing.expect(isInside(example_edges, P.init(7, 2), &cache));
+    try std.testing.expect(isInside(example_edges, P.init(11, 6), &cache));
+    try std.testing.expect(isInside(example_edges, P.init(6, 5), &cache));
 
     // Edge ends
     for (example_edges) |edge| {
-        try std.testing.expect(isInside(example_edges, edge.p));
+        try std.testing.expect(isInside(example_edges, edge.p, &cache));
     }
 }
 
 fn isRectInside(
     edges: []const Line,
     rect: Line,
+    cache: *Cache,
 ) bool {
     if (rect.isHorizontal() or rect.isVertical()) return true;
 
@@ -250,7 +262,7 @@ fn isRectInside(
     while (x <= rect.q.x) : (x += 1) {
         var y = @min(rect.p.y, rect.q.y);
         while (y <= @max(rect.p.y, rect.q.y)) : (y += 1) {
-            if (!isInside(edges, P.init(x, y))) return false;
+            if (!isInside(edges, P.init(x, y), cache)) return false;
         }
     }
 
@@ -258,11 +270,64 @@ fn isRectInside(
 }
 
 test "isRectInside" {
-    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(7, 3), P.init(11, 1))));
-    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(9, 7), P.init(9, 5))));
-    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(9, 5), P.init(2, 3))));
-    try std.testing.expect(!isRectInside(example_edges, Line.init(P.init(7, 1), P.init(9, 7))));
-    try std.testing.expect(!isRectInside(example_edges, Line.init(P.init(7, 1), P.init(11, 7))));
+    var cache = try Cache.init(std.testing.allocator, 10, 12);
+    defer cache.deinit();
+
+    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(7, 3), P.init(11, 1)), &cache));
+    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(9, 7), P.init(9, 5)), &cache));
+    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(9, 5), P.init(2, 3)), &cache));
+    try std.testing.expect(!isRectInside(example_edges, Line.init(P.init(7, 1), P.init(9, 7)), &cache));
+    try std.testing.expect(!isRectInside(example_edges, Line.init(P.init(7, 1), P.init(11, 7)), &cache));
+}
+
+const Cache = struct {
+    cache: [][]?bool,
+    alloc: std.mem.Allocator,
+
+    const Self = @This();
+
+    fn init(alloc: std.mem.Allocator, rows: usize, cols: usize) !Self {
+        const cache = try alloc.alloc([]?bool, cols);
+        for (cache) |*col| {
+            col.* = try alloc.alloc(?bool, rows);
+            @memset(col.*, null);
+        }
+
+        return Self{
+            .alloc = alloc,
+            .cache = cache,
+        };
+    }
+
+    fn deinit(self: *Self) void {
+        for (self.cache) |*col| {
+            self.alloc.free(col.*);
+        }
+        self.alloc.free(self.cache);
+    }
+
+    fn get(self: Self, x: usize, y: usize) ?bool {
+        return self.cache[x][y];
+    }
+
+    fn set(self: *Self, x: usize, y: usize, flag: bool) void {
+        self.cache[x][y] = flag;
+    }
+};
+
+test "Cache" {
+    var cache = try Cache.init(std.testing.allocator, 3, 5);
+    defer cache.deinit();
+
+    try std.testing.expectEqual(null, cache.get(2, 1));
+    cache.set(2, 1, true);
+    try std.testing.expectEqual(true, cache.get(2, 1));
+
+    cache.set(4, 2, true);
+    try std.testing.expectEqual(true, cache.get(4, 2));
+
+    cache.set(0, 0, false);
+    try std.testing.expectEqual(false, cache.get(0, 0));
 }
 
 pub fn part2(
@@ -289,10 +354,14 @@ pub fn part2(
     defer rects.deinit(alloc);
     std.debug.print("Rect calculation done\n", .{});
 
+    var cache = try Cache.init(alloc, top + 1, right + 1);
+    defer cache.deinit();
+    std.debug.print("Cache initialized\n", .{});
+
     var max: u64 = 0;
     for (rects.items, 0..) |rect, i| {
         std.debug.print("  processing rect {d}/{d}: {f}\n", .{ i, rects.items.len, rect });
-        if (isRectInside(edges.items, rect)) {
+        if (isRectInside(edges.items, rect, &cache)) {
             std.debug.print("    rect is inside\n", .{});
             if (rect.area() > max) {
                 max = rect.area();
