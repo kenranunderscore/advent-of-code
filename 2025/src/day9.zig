@@ -174,7 +174,7 @@ fn isInside(
     p: P,
 ) bool {
     var inside = false;
-    outer: for (edges) |edge| {
+    for (edges) |edge| {
         if (edge.isVertical() and edge.p.x == p.x and isBetween(p.y, edge.p.y, edge.q.y)) {
             return true;
         }
@@ -183,15 +183,8 @@ fn isInside(
             return true;
         }
 
-        for (0..p.x) |x| {
-            if (edge.isVertical() and @min(edge.p.y, edge.q.y) < p.y and p.y < @max(edge.p.y, edge.q.y) and edge.p.x == x)
-                inside = !inside;
-
-            // Use that edges are left-to-right and we cast the ray right-to-left
-            if (edge.isHorizontal() and p.y == edge.p.y and edge.q.x == x) {
-                inside = !inside;
-                continue :outer;
-            }
+        if (edge.isVertical() and edge.p.x < p.x and @min(edge.p.y, edge.q.y) < p.y and p.y <= @max(edge.p.y, edge.q.y)) {
+            inside = !inside;
         }
     }
 
@@ -227,15 +220,20 @@ test "isInside" {
     for (example_edges) |edge| {
         try std.testing.expect(isInside(example_edges, edge.p));
     }
+
+    // Outside points
+    try std.testing.expect(!isInside(example_edges, P.init(12, 1)));
 }
 
 fn isRectInside(
     edges: []const Line,
     rect: Line,
 ) bool {
+    // Skip rectangles whose corners aren't even on the inside
     if (!isInside(edges, P.init(rect.p.x, rect.q.y))) return false;
     if (!isInside(edges, P.init(rect.q.x, rect.p.y))) return false;
 
+    // Walk the four edges of the rectangle
     var x = rect.p.x;
     while (x <= rect.q.x) : (x += 1) {
         if (!isInside(edges, P.init(x, rect.p.y))) return false;
@@ -247,6 +245,61 @@ fn isRectInside(
         if (!isInside(edges, P.init(rect.p.x, y))) return false;
         if (!isInside(edges, P.init(rect.q.x, y))) return false;
     }
+
+    // Observation (either wrong or badly implemented):
+    //   - For any rectangle whose corners are on the inside but that they aren't fully inside,
+    //     there needs to exist an outer edge intersecting it. The problem that many online
+    //     solutions seem to overlook (as it doesn't exist in the input) is that there are edge
+    //     cases where the rectangle has (2 or more) real intersections (possibly even with both
+    //     of their end points outside of the rectangle) but nevertheless is fully on the inside.
+    //     This is due to the integer nature of the grid (edges have a width, and thus two
+    //     neighboring edges don't leave any gap in the rectangle). That's hard to test for...
+    //   - One idea to check for this is that in in any of these edge cases, a 90-degree angle
+    //     vertex needs to lie inside the rectangle. So if that's the case, we could check the
+    //     diagonally adjacent fields of this vertex: if this edge does indeed cut something out
+    //     of the rectangle, one of these four fields should be "it", if I'm not mistaken. The
+    //     code below fails, though, but sadly not in any of my test cases...
+    //
+    // for (edges) |edge| {
+    //     if (rectContainsPoint(rect, edge.p)) {
+    //         std.debug.print("  rect {f} contains p {f}\n", .{ rect, edge.p });
+    //         if (edge.p.x > 0 and edge.p.y > 0 and !isInside(edges, P.init(edge.p.x - 1, edge.p.y - 1))) {
+    //             std.debug.print("      {f} outside 1\n", .{edge.p});
+    //             return false;
+    //         }
+    //         if (edge.p.x > 0 and !isInside(edges, P.init(edge.p.x - 1, edge.p.y + 1))) {
+    //             std.debug.print("      {f} outside 2\n", .{edge.p});
+    //             return false;
+    //         }
+    //         if (edge.p.y > 0 and !isInside(edges, P.init(edge.p.x + 1, edge.p.y - 1))) {
+    //             std.debug.print("      {f} outside 3\n", .{edge.p});
+    //             return false;
+    //         }
+    //         if (!isInside(edges, P.init(edge.p.x + 1, edge.p.y + 1))) {
+    //             std.debug.print("      {f} outside 4\n", .{edge.p});
+    //             return false;
+    //         }
+    //     }
+    //     if (rectContainsPoint(rect, edge.q)) {
+    //         std.debug.print("  rect {f} contains q {f}\n", .{ rect, edge.p });
+    //         if (edge.q.x > 0 and edge.q.y > 0 and !isInside(edges, P.init(edge.q.x - 1, edge.q.y - 1))) {
+    //             std.debug.print("      {f} outside 1\n", .{edge.p});
+    //             return false;
+    //         }
+    //         if (edge.q.x > 0 and !isInside(edges, P.init(edge.q.x - 1, edge.q.y + 1))) {
+    //             std.debug.print("      {f} outside 2\n", .{edge.p});
+    //             return false;
+    //         }
+    //         if (edge.q.y > 0 and !isInside(edges, P.init(edge.q.x + 1, edge.q.y - 1))) {
+    //             std.debug.print("      {f} outside 3\n", .{edge.p});
+    //             return false;
+    //         }
+    //         if (!isInside(edges, P.init(edge.q.x + 1, edge.q.y + 1))) {
+    //             std.debug.print("      {f} outside 4\n", .{edge.p});
+    //             return false;
+    //         }
+    //     }
+    // }
 
     return true;
 }
@@ -274,6 +327,7 @@ test "isRectInside counter-example" {
         Line.init(P.init(2, 4), P.init(2, 2)),
         Line.init(P.init(2, 2), P.init(0, 2)),
     };
+    try std.testing.expect(!isInside(example, P.init(7, 0)));
     try std.testing.expect(isRectInside(example, Line.init(P.init(0, 2), P.init(7, 2))));
     try std.testing.expect(isRectInside(example, Line.init(P.init(2, 2), P.init(4, 4))));
     try std.testing.expect(!isRectInside(example, Line.init(P.init(4, 0), P.init(7, 2))));
@@ -309,8 +363,6 @@ pub fn part2(
         if (isRectInside(edges.items, rect)) {
             std.debug.print("    rect is inside! area: {d}\n", .{rect.area()});
             break;
-        } else {
-            std.debug.print("    X\n", .{});
         }
     }
 }
