@@ -4,25 +4,99 @@ const util = @import("util.zig");
 const P = struct {
     x: u32,
     y: u32,
+
+    fn init(x: u32, y: u32) P {
+        return P{ .x = x, .y = y };
+    }
+
+    pub fn format(
+        self: P,
+        writer: anytype,
+    ) !void {
+        try writer.print("({d}, {d})", .{ self.x, self.y });
+    }
 };
 
 const Line = struct {
     p: P,
     q: P,
 
-    fn area(self: Line) u64 {
+    const Self = @This();
+
+    fn init(p: P, q: P) Self {
+        if (p.x < q.x or (p.x == q.x and p.y < q.y))
+            return Self{ .p = p, .q = q }
+        else
+            return Self{ .p = q, .q = p };
+    }
+
+    fn area(self: Self) u64 {
         return (@abs(@as(i33, self.p.x) - @as(i33, self.q.x)) + 1) *
             (@abs(@as(i33, self.p.y) - @as(i33, self.q.y)) + 1);
     }
 
-    fn isVertical(self: Line) bool {
+    fn isVertical(self: Self) bool {
         return self.p.x == self.q.x;
     }
 
-    fn isHorizontal(self: Line) bool {
+    fn isHorizontal(self: Self) bool {
         return self.p.y == self.q.y;
     }
+
+    fn cutsRect(self: Self, rect: Self) bool {
+        return (rectContainsPoint(rect, self.p) and !rectContainsPoint(rect, self.q)) or
+            (rectContainsPoint(rect, self.q) and !rectContainsPoint(rect, self.p));
+    }
+
+    pub fn format(
+        self: Self,
+        writer: anytype,
+    ) !void {
+        try writer.print("[{f} to {f}]", .{ self.p, self.q });
+    }
 };
+
+test "area" {
+    try std.testing.expectEqual(5, Line.init(P.init(0, 0), P.init(0, 4)).area());
+    try std.testing.expectEqual(12, Line.init(P.init(4, 0), P.init(1, 2)).area());
+    try std.testing.expectEqual(12, Line.init(P.init(0, 0), P.init(2, 3)).area());
+}
+
+fn rectContainsPoint(rect: Line, p: P) bool {
+    const min_x = @min(rect.p.x, rect.q.x);
+    const min_y = @min(rect.p.y, rect.q.y);
+    const max_x = @max(rect.p.x, rect.q.x);
+    const max_y = @max(rect.p.y, rect.q.y);
+
+    return min_x < p.x and p.x < max_x and min_y < p.y and p.y < max_y;
+}
+
+test "rectContainsPoint" {
+    const rect = Line.init(P.init(0, 0), P.init(5, 7));
+    try std.testing.expect(!rectContainsPoint(rect, P.init(0, 0)));
+    try std.testing.expect(!rectContainsPoint(rect, P.init(5, 7)));
+    try std.testing.expect(!rectContainsPoint(rect, P.init(4, 7)));
+    try std.testing.expect(!rectContainsPoint(rect, P.init(2, 0)));
+    try std.testing.expect(!rectContainsPoint(rect, P.init(0, 6)));
+
+    var i: u32 = 1;
+    while (i < 5) : (i += 1) {
+        var j: u32 = 1;
+        while (j < 7) : (j += 1) {
+            try std.testing.expect(rectContainsPoint(rect, P.init(i, j)));
+        }
+    }
+}
+
+test "cutsRect" {
+    const rect = Line.init(P.init(1, 1), P.init(5, 7));
+
+    var l = Line.init(P.init(3, 0), P.init(3, 2));
+    try std.testing.expect(l.cutsRect(rect));
+
+    l = Line.init(P.init(3, 0), P.init(3, 1));
+    try std.testing.expect(!l.cutsRect(rect));
+}
 
 fn width(rect: Line) u32 {
     return @max(rect.p.x, rect.q.x) - @min(rect.p.x, rect.q.x) + 1;
@@ -46,7 +120,7 @@ fn parsePoint(line: []const u8) !P {
 
 fn getRects(
     alloc: std.mem.Allocator,
-    points: []P,
+    points: []const P,
 ) !std.ArrayList(Line) {
     const n_rects = @divExact(points.len * (points.len - 1), 2);
 
@@ -54,10 +128,7 @@ fn getRects(
 
     for (0..points.len - 1) |i| {
         for (i + 1..points.len) |j| {
-            try rects.append(
-                alloc,
-                Line{ .p = points[i], .q = points[j] },
-            );
+            try rects.append(alloc, Line.init(points[i], points[j]));
         }
     }
 
@@ -66,9 +137,9 @@ fn getRects(
 
 pub fn part1(
     alloc: std.mem.Allocator,
-    points: std.ArrayList(P),
+    points: []const P,
 ) !void {
-    var rects = try getRects(alloc, points.items);
+    var rects = try getRects(alloc, points);
     defer rects.deinit(alloc);
 
     var max: u64 = 0;
@@ -84,8 +155,8 @@ pub fn part1(
     std.debug.print("Part 1: {d}\n", .{max});
 }
 
-fn containsPoint(points: std.ArrayList(P), p: P) bool {
-    for (points.items) |q| {
+fn containsPoint(points: []const P, p: P) bool {
+    for (points) |q| {
         if (q.x == p.x and q.y == p.y) return true;
     }
 
@@ -94,60 +165,115 @@ fn containsPoint(points: std.ArrayList(P), p: P) bool {
 
 fn getEdges(
     alloc: std.mem.Allocator,
-    points: std.ArrayList(P),
+    points: []const P,
 ) !std.ArrayList(Line) {
     var edges: std.ArrayList(Line) = .empty;
 
-    for (0..points.items.len - 1) |i| {
-        const edge = Line{ .p = points.items[i], .q = points.items[i + 1] };
+    for (0..points.len - 1) |i| {
+        const edge = Line.init(points[i], points[i + 1]);
         try edges.append(alloc, edge);
     }
+
+    // Connect last and first point
+    try edges.append(alloc, Line.init(points[points.len - 1], points[0]));
 
     return edges;
 }
 
 fn isInside(
-    edges: std.ArrayList(Line),
+    edges: []const Line,
     p: P,
 ) bool {
     var inside = false;
-    for (0..p.x) |x| {
-        for (edges.items) |edge| {
-            if (edge.isVertical() and isBetween(p.y, edge.p.y, edge.q.y) and edge.p.x == x)
+
+    outer: for (edges) |edge| {
+        if (edge.isVertical() and edge.p.x == p.x and isBetween(p.y, edge.p.y, edge.q.y))
+            return true;
+
+        if (edge.isHorizontal() and edge.p.y == p.y and isBetween(p.x, edge.p.x, edge.q.x))
+            return true;
+
+        for (0..p.x) |x| {
+            if (edge.isVertical() and @min(edge.p.y, edge.q.y) < p.y and p.y < @max(edge.p.y, edge.q.y) and edge.p.x == x)
                 inside = !inside;
+
+            // Use that edges are left-to-right and we cast the ray right-to-left
+            if (edge.isHorizontal() and p.y == edge.p.y and edge.q.x == x) {
+                inside = !inside;
+                continue :outer;
+            }
         }
     }
+
     return inside;
 }
 
+const example_edges: []const Line = &[_]Line{
+    Line.init(P.init(7, 1), P.init(11, 1)),
+    Line.init(P.init(11, 1), P.init(11, 7)),
+    Line.init(P.init(11, 7), P.init(9, 7)),
+    Line.init(P.init(9, 7), P.init(9, 5)),
+    Line.init(P.init(9, 5), P.init(2, 5)),
+    Line.init(P.init(2, 5), P.init(2, 3)),
+    Line.init(P.init(2, 3), P.init(7, 3)),
+    Line.init(P.init(7, 3), P.init(7, 1)),
+};
+
+test "isInside" {
+    // Inside the true interior
+    try std.testing.expect(isInside(example_edges, P.init(9, 2)));
+    try std.testing.expect(isInside(example_edges, P.init(9, 4)));
+    try std.testing.expect(isInside(example_edges, P.init(5, 4)));
+    try std.testing.expect(isInside(example_edges, P.init(3, 4)));
+    try std.testing.expect(isInside(example_edges, P.init(10, 6)));
+    try std.testing.expect(isInside(example_edges, P.init(8, 3)));
+
+    // Points between edge ends
+    try std.testing.expect(isInside(example_edges, P.init(7, 2)));
+    try std.testing.expect(isInside(example_edges, P.init(11, 6)));
+    try std.testing.expect(isInside(example_edges, P.init(6, 5)));
+
+    // Edge ends
+    for (example_edges) |edge| {
+        try std.testing.expect(isInside(example_edges, edge.p));
+    }
+}
+
 fn isRectInside(
-    edges: std.ArrayList(Line),
+    edges: []const Line,
     rect: Line,
 ) bool {
-    const x = @min(rect.p.x, rect.q.x);
-    const y = @min(rect.p.y, rect.q.y);
+    if (rect.isHorizontal() or rect.isVertical()) return true;
 
-    var i: u32 = 0;
-    var j: u32 = 0;
-    while (i < width(rect)) : (i += 1) {
-        while (j < height(rect)) : (j += 1) {
-            const p = P{ .x = x + i, .y = y + j };
-            if (!isInside(edges, p)) return false;
+    // Lines created with .init are ordered
+    var x = rect.p.x;
+    while (x <= rect.q.x) : (x += 1) {
+        var y = @min(rect.p.y, rect.q.y);
+        while (y <= @max(rect.p.y, rect.q.y)) : (y += 1) {
+            if (!isInside(edges, P.init(x, y))) return false;
         }
     }
 
     return true;
 }
 
+test "isRectInside" {
+    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(7, 3), P.init(11, 1))));
+    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(9, 7), P.init(9, 5))));
+    try std.testing.expect(isRectInside(example_edges, Line.init(P.init(9, 5), P.init(2, 3))));
+    try std.testing.expect(!isRectInside(example_edges, Line.init(P.init(7, 1), P.init(9, 7))));
+    try std.testing.expect(!isRectInside(example_edges, Line.init(P.init(7, 1), P.init(11, 7))));
+}
+
 pub fn part2(
     alloc: std.mem.Allocator,
-    points: std.ArrayList(P),
+    points: []const P,
 ) !void {
     var left: u32 = std.math.maxInt(u32);
     var right: u32 = 0;
     var bottom: u32 = std.math.maxInt(u32);
     var top: u32 = 0;
-    for (points.items) |p| {
+    for (points) |p| {
         if (p.x < left) left = p.x;
         if (p.x > right) right = p.x;
         if (p.y < bottom) bottom = p.y;
@@ -159,25 +285,27 @@ pub fn part2(
     defer edges.deinit(alloc);
     std.debug.print("Edge calculation done\n", .{});
 
-    var rects = try getRects(alloc, points.items);
+    var rects = try getRects(alloc, points);
     defer rects.deinit(alloc);
     std.debug.print("Rect calculation done\n", .{});
 
     var max: u64 = 0;
     for (rects.items, 0..) |rect, i| {
-        std.debug.print("  processed rect {d}/{d}\n", .{ i, rects.items.len });
-        if (rect.area() > max and isRectInside(edges, rect)) {
-            max = rect.area();
-            std.debug.print(
-                "  new max rect: ({d}, {d}) - ({d}, {d}),    area: {d}\n",
-                .{ rect.p.x, rect.p.y, rect.q.x, rect.q.y, rect.area() },
-            );
+        std.debug.print("  processing rect {d}/{d}: {f}\n", .{ i, rects.items.len, rect });
+        if (isRectInside(edges.items, rect)) {
+            std.debug.print("    rect is inside\n", .{});
+            if (rect.area() > max) {
+                max = rect.area();
+                std.debug.print("    new max rect -> area: {d}\n", .{rect.area()});
+            }
+        } else {
+            std.debug.print("    X\n", .{});
         }
     }
 }
 
 pub fn main() !void {
-    var alloc = std.heap.DebugAllocator(.{}).init;
+    var alloc = std.heap.GeneralPurposeAllocator(.{}).init;
     defer std.debug.assert(alloc.deinit() == .ok);
     const gpa = alloc.allocator();
 
@@ -193,6 +321,6 @@ pub fn main() !void {
         try points.append(gpa, try parsePoint(line));
     }
 
-    try part1(gpa, points);
-    try part2(gpa, points);
+    try part1(gpa, points.items);
+    try part2(gpa, points.items);
 }
