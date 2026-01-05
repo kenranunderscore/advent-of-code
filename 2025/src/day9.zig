@@ -259,7 +259,9 @@ fn isRectInside(
 
     // Lines created with .init are ordered
     var x = rect.p.x;
+    const w = rect.q.x - rect.p.x;
     while (x <= rect.q.x) : (x += 1) {
+        std.debug.print("      column {d}/{d}\n", .{ x - rect.p.x + 1, w });
         var y = @min(rect.p.y, rect.q.y);
         while (y <= @max(rect.p.y, rect.q.y)) : (y += 1) {
             if (!isInside(edges, P.init(x, y), cache)) return false;
@@ -281,17 +283,14 @@ test "isRectInside" {
 }
 
 const Cache = struct {
-    cache: [][]?bool,
+    cache: []?bool,
     alloc: std.mem.Allocator,
 
     const Self = @This();
 
     fn init(alloc: std.mem.Allocator, rows: usize, cols: usize) !Self {
-        const cache = try alloc.alloc([]?bool, cols);
-        for (cache) |*col| {
-            col.* = try alloc.alloc(?bool, rows);
-            @memset(col.*, null);
-        }
+        const cache = try alloc.alloc(?bool, rows * cols);
+        @memset(cache, null);
 
         return Self{
             .alloc = alloc,
@@ -300,18 +299,15 @@ const Cache = struct {
     }
 
     fn deinit(self: *Self) void {
-        for (self.cache) |*col| {
-            self.alloc.free(col.*);
-        }
         self.alloc.free(self.cache);
     }
 
     fn get(self: Self, x: usize, y: usize) ?bool {
-        return self.cache[x][y];
+        return self.cache[x * y + x];
     }
 
     fn set(self: *Self, x: usize, y: usize, flag: bool) void {
-        self.cache[x][y] = flag;
+        self.cache[x * y + x] = flag;
     }
 };
 
