@@ -1,6 +1,8 @@
 const std = @import("std");
 const util = @import("util.zig");
 
+const print = std.debug.print;
+
 const P = struct {
     x: u32,
     y: u32,
@@ -17,6 +19,7 @@ const P = struct {
     }
 };
 
+/// Axis-aligned is assumed
 const Line = struct {
     p: P,
     q: P,
@@ -40,7 +43,24 @@ const Line = struct {
         self: Line,
         writer: anytype,
     ) !void {
-        try writer.print("{{f}, {f}}", .{ self.p, self.q });
+        try writer.print("({f}, {f})", .{ self.p, self.q });
+    }
+
+    /// Assumes different orientation, and non-zero length
+    fn intersects(self: Line, other: Line) bool {
+        if (self.isHorizontal()) {
+            return other.isVertical() and
+                self.p.x < other.p.x and
+                other.p.x < self.q.x and
+                @min(other.p.y, other.q.y) < self.p.y and
+                @max(other.p.y, other.q.y) > self.p.y;
+        } else {
+            return other.isHorizontal() and
+                @min(self.p.y, self.q.y) < other.p.y and
+                @max(self.p.y, self.q.y) > other.p.y and
+                other.p.x < self.p.x and
+                other.q.x > self.p.x;
+        }
     }
 };
 
@@ -103,73 +123,48 @@ const Loop = struct {
         if (!self.contains(P.init(rect.p.x, rect.q.y))) return false;
         if (!self.contains(P.init(rect.q.x, rect.p.y))) return false;
 
-        // Walk the four edges of the rectangle
-        var x = rect.p.x;
-        while (x <= rect.q.x) : (x += 1) {
-            if (!self.contains(P.init(x, rect.p.y))) return false;
-            if (!self.contains(P.init(x, rect.q.y))) return false;
-        }
+        for (self.edges.items) |edge| {
+            if (rect.trulyContains(edge.p) or rect.trulyContains(edge.q)) {
+                // `edge` intersects the rectangle: Now if any of the points diagonally adjacent
+                // to the end point inside rect is "outside", that is cut out of the rectangle,
+                // making it invalid.
+                const z = if (rect.trulyContains(edge.p)) edge.p else edge.q;
+                if (z.x > 0 and z.y > 0 and !self.contains(P.init(z.x - 1, z.y - 1)))
+                    return false;
+                if (z.x > 0 and !self.contains(P.init(z.x - 1, z.y + 1)))
+                    return false;
+                if (z.y > 0 and !self.contains(P.init(z.x + 1, z.y - 1)))
+                    return false;
+                if (!self.contains(P.init(z.x + 1, z.y + 1)))
+                    return false;
+            } else {
+                // If `edge` still intersects `rect`, it goes through the whole thing: Now find
+                // a point truly inside rect and check its two neighbors. This rules out some
+                // edge cases where adjacent and parallel lines go through the rectangle, but
+                // not carving out anything (due to lines having non-zero width in integer
+                // scenarios such as this one).
+                const px_qy = P.init(rect.p.x, rect.q.y);
+                const qx_py = P.init(rect.q.x, rect.p.y);
+                const h1 = Line.init(rect.p, qx_py);
+                const h2 = Line.init(px_qy, rect.q);
+                const v1 = Line.init(rect.p, px_qy);
+                const v2 = Line.init(rect.q, qx_py);
 
-        var y = @min(rect.p.y, rect.q.y);
-        while (y <= @max(rect.p.y, rect.q.y)) : (y += 1) {
-            if (!self.contains(P.init(rect.p.x, y))) return false;
-            if (!self.contains(P.init(rect.q.x, y))) return false;
+                if (edge.intersects(h1) or edge.intersects(h2) or edge.intersects(v1) or edge.intersects(v2)) {
+                    // intersects checks for "true" intersection, and the rect isn't degenerate,
+                    // so we can just create points on the line and inside the rect
+                    if (edge.isHorizontal()) {
+                        const z = P.init(rect.p.x + 1, edge.p.y);
+                        if (z.y > 0 and !self.contains(P.init(z.x, z.y - 1)) or !self.contains(P.init(z.x, z.y + 1)))
+                            return false;
+                    } else {
+                        const z = P.init(edge.p.x, @min(rect.p.y, rect.q.y) + 1);
+                        if (z.x > 0 and !self.contains(P.init(z.x - 1, z.y)) or !self.contains(P.init(z.x + 1, z.y)))
+                            return false;
+                    }
+                }
+            }
         }
-
-        // Observation (either wrong or badly implemented):
-        //   - For any rectangle whose corners are on the inside but that they aren't fully inside,
-        //     there needs to exist an outer edge intersecting it. The problem that many online
-        //     solutions seem to overlook (as it doesn't exist in the input) is that there are edge
-        //     cases where the rectangle has (2 or more) real intersections (possibly even with both
-        //     of their end points outside of the rectangle) but nevertheless is fully on the inside.
-        //     This is due to the integer nature of the grid (edges have a width, and thus two
-        //     neighboring edges don't leave any gap in the rectangle). That's hard to test for...
-        //   - One idea to check for this is that in in any of these edge cases, a 90-degree angle
-        //     vertex needs to lie inside the rectangle. So if that's the case, we could check the
-        //     diagonally adjacent fields of this vertex: if this edge does indeed cut something out
-        //     of the rectangle, one of these four fields should be "it", if I'm not mistaken. The
-        //     code below fails, though, but sadly not in any of my test cases...
-        //
-        // for (edges) |edge| {
-        //     if (rectContainsPoint(rect, edge.p)) {
-        //         std.debug.print("  rect {f} contains p {f}\n", .{ rect, edge.p });
-        //         if (edge.p.x > 0 and edge.p.y > 0 and !isInside(edges, P.init(edge.p.x - 1, edge.p.y - 1))) {
-        //             std.debug.print("      {f} outside 1\n", .{edge.p});
-        //             return false;
-        //         }
-        //         if (edge.p.x > 0 and !isInside(edges, P.init(edge.p.x - 1, edge.p.y + 1))) {
-        //             std.debug.print("      {f} outside 2\n", .{edge.p});
-        //             return false;
-        //         }
-        //         if (edge.p.y > 0 and !isInside(edges, P.init(edge.p.x + 1, edge.p.y - 1))) {
-        //             std.debug.print("      {f} outside 3\n", .{edge.p});
-        //             return false;
-        //         }
-        //         if (!isInside(edges, P.init(edge.p.x + 1, edge.p.y + 1))) {
-        //             std.debug.print("      {f} outside 4\n", .{edge.p});
-        //             return false;
-        //         }
-        //     }
-        //     if (rectContainsPoint(rect, edge.q)) {
-        //         std.debug.print("  rect {f} contains q {f}\n", .{ rect, edge.p });
-        //         if (edge.q.x > 0 and edge.q.y > 0 and !isInside(edges, P.init(edge.q.x - 1, edge.q.y - 1))) {
-        //             std.debug.print("      {f} outside 1\n", .{edge.p});
-        //             return false;
-        //         }
-        //         if (edge.q.x > 0 and !isInside(edges, P.init(edge.q.x - 1, edge.q.y + 1))) {
-        //             std.debug.print("      {f} outside 2\n", .{edge.p});
-        //             return false;
-        //         }
-        //         if (edge.q.y > 0 and !isInside(edges, P.init(edge.q.x + 1, edge.q.y - 1))) {
-        //             std.debug.print("      {f} outside 3\n", .{edge.p});
-        //             return false;
-        //         }
-        //         if (!isInside(edges, P.init(edge.q.x + 1, edge.q.y + 1))) {
-        //             std.debug.print("      {f} outside 4\n", .{edge.p});
-        //             return false;
-        //         }
-        //     }
-        // }
 
         return true;
     }
@@ -255,7 +250,7 @@ pub fn part1(
         }
     }
 
-    std.debug.print("Part 1: {d}\n", .{max});
+    print("Part 1: {d}\n", .{max});
 }
 
 fn containsPoint(points: []const P, p: P) bool {
@@ -281,31 +276,19 @@ pub fn part2(
     alloc: std.mem.Allocator,
     points: []const P,
 ) !void {
-    var left: u32 = std.math.maxInt(u32);
-    var right: u32 = 0;
-    var bottom: u32 = std.math.maxInt(u32);
-    var top: u32 = 0;
-    for (points) |p| {
-        if (p.x < left) left = p.x;
-        if (p.x > right) right = p.x;
-        if (p.y < bottom) bottom = p.y;
-        if (p.y > top) top = p.y;
-    }
-    std.debug.print("Grid: ({d}, {d}) to ({d}, {d})\n", .{ left, bottom, right, top });
-
     var loop = try Loop.init(alloc, points);
     defer loop.deinit();
-    std.debug.print("Loop calculation done\n", .{});
+    print("Loop calculation done\n", .{});
 
     var rects = try getRects(alloc, points);
     defer rects.deinit(alloc);
     std.sort.heap(Rect, rects.items, {}, Rect.areaGreaterThan);
-    std.debug.print("Rect calculation done\n", .{});
+    print("Rect calculation done\n", .{});
 
     for (rects.items, 0..) |rect, i| {
-        std.debug.print("  processing rect {d}/{d}: {f}\n", .{ i, rects.items.len, rect });
+        print("  Processing rect {d}/{d}\n", .{ i, rects.items.len });
         if (loop.containsRect(rect)) {
-            std.debug.print("    rect is inside! area: {d}\n", .{rect.area()});
+            print("    Found it! Its area is {d}\n", .{rect.area()});
             break;
         }
     }
