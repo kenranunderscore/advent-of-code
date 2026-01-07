@@ -179,15 +179,20 @@ test "test input part 1" {
     try std.testing.expectEqual(4277556, part1(ctx));
 }
 
-test "part 1" {
-    const a = std.testing.allocator;
-    var ctx = Context.init(a);
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const alloc = gpa.allocator();
+
+    var ctx = Context.init(alloc);
     defer ctx.deinit();
 
-    try util.processFile(a, "input/day6", &ctx, callback, '\n');
-    try std.testing.expectEqual(5361735137219, part1(ctx));
-}
+    try util.processFile(alloc, "input/day6", &ctx, callback, '\n');
+    const part1_result = part1(ctx);
+    std.debug.assert(5361735137219 == part1_result);
 
-test "part 2" {
-    try std.testing.expectEqual(11744693538946, try part2(std.testing.allocator));
+    const part2_result = try part2(alloc);
+    std.debug.assert(11744693538946 == part2_result);
+
+    std.debug.print("Part 1: {d}\nPart 2: {d}\n", .{ part1_result, part2_result });
 }

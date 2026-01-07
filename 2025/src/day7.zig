@@ -94,22 +94,22 @@ fn part2(
     return error.NoStartingPositionFound;
 }
 
-test "part 1" {
-    const a = std.testing.allocator;
-    var ctx = Context{ .allocator = a };
-    defer ctx.deinit();
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const alloc = gpa.allocator();
 
-    try util.processFile(a, "input/day7", &ctx, callback, '\n');
+    var ctx_part1 = Context{ .allocator = alloc };
+    defer ctx_part1.deinit();
+    try util.processFile(alloc, "input/day7", &ctx_part1, callback, '\n');
+    const part1_result = try part1(&ctx_part1);
+    std.debug.assert(1675 == part1_result);
 
-    try std.testing.expectEqual(1675, try part1(&ctx));
-}
+    var ctx_part2 = Context{ .allocator = alloc };
+    defer ctx_part2.deinit();
+    try util.processFile(alloc, "input/day7", &ctx_part2, callback, '\n');
+    const part2_result = try part2(alloc, ctx_part2.lines.items);
+    std.debug.assert(187987920774390 == part2_result);
 
-test "part 2" {
-    const a = std.testing.allocator;
-    var ctx = Context{ .allocator = a };
-    defer ctx.deinit();
-
-    try util.processFile(a, "input/day7", &ctx, callback, '\n');
-
-    try std.testing.expectEqual(187987920774390, try part2(a, ctx.lines.items));
+    std.debug.print("Part 1: {d}\nPart 2: {d}\n", .{ part1_result, part2_result });
 }

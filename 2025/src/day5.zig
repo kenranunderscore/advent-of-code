@@ -112,19 +112,27 @@ fn part2(_: std.mem.Allocator, ranges: *std.ArrayList(Range)) !usize {
     return sum;
 }
 
-test {
-    const a = std.testing.allocator;
-    var ctx = Context.init(a);
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const alloc = gpa.allocator();
+
+    var ctx = Context.init(alloc);
     defer ctx.deinit();
 
     try util.processFile(
-        a,
+        alloc,
         "input/day5",
         &ctx,
         callback,
         '\n',
     );
 
-    try std.testing.expectEqual(617, part1(ctx.ranges, ctx.numbers));
-    try std.testing.expectEqual(338258295736104, part2(a, &ctx.ranges));
+    const part1_result = part1(ctx.ranges, ctx.numbers);
+    std.debug.assert(617 == part1_result);
+
+    const part2_result = try part2(alloc, &ctx.ranges);
+    std.debug.assert(338258295736104 == part2_result);
+
+    std.debug.print("Part 1: {d}\nPart 2: {d}\n", .{ part1_result, part2_result });
 }

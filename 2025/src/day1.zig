@@ -43,14 +43,28 @@ fn countZeroesCallback(line: []const u8, ctx: *Context) !void {
     ctx.count_part2 += hits;
 }
 
-fn run(ctx: *Context) !void {
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const alloc = gpa.allocator();
+
+    var ctx = Context{
+        .pos = 50,
+        .count_part1 = 0,
+        .count_part2 = 0,
+    };
+
     try util.processFile(
-        std.testing.allocator,
+        alloc,
         "input/day1",
-        ctx,
+        &ctx,
         countZeroesCallback,
         '\n',
     );
+
+    std.debug.print("Part 1: {d}\nPart 2: {d}\n", .{ ctx.count_part1, ctx.count_part2 });
+    std.debug.assert(1147 == ctx.count_part1);
+    std.debug.assert(6789 == ctx.count_part2);
 }
 
 test "example input" {
@@ -95,15 +109,4 @@ test "more special cases" {
 
     _, hits = rotateDial(0, -500);
     try std.testing.expectEqual(5, hits);
-}
-
-test "part 1 and 2" {
-    var ctx = Context{
-        .pos = 50,
-        .count_part1 = 0,
-        .count_part2 = 0,
-    };
-    try run(&ctx);
-    try std.testing.expectEqual(1147, ctx.count_part1);
-    try std.testing.expectEqual(6789, ctx.count_part2);
 }

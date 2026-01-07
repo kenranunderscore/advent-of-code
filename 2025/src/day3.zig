@@ -46,15 +46,21 @@ test "maxJoltage" {
     try expectEqual(888911112111, maxJoltage("818181911112111", 12));
 }
 
-test {
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const alloc = gpa.allocator();
+
     var ctx = Context{};
     try util.processFile(
-        std.testing.allocator,
+        alloc,
         "input/day3",
         &ctx,
         callback,
         '\n',
     );
-    try std.testing.expectEqual(16_854, ctx.sum_part1);
-    try std.testing.expectEqual(167_526_011_932_478, ctx.sum_part2);
+    std.debug.assert(16_854 == ctx.sum_part1);
+    std.debug.assert(167_526_011_932_478 == ctx.sum_part2);
+
+    std.debug.print("Part 1: {d}\nPart 2: {d}\n", .{ ctx.sum_part1, ctx.sum_part2 });
 }

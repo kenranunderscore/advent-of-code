@@ -188,14 +188,19 @@ fn run(ctx: Context) !Results {
     unreachable;
 }
 
-test "part 1" {
-    const a = std.testing.allocator;
-    var ctx: Context = .init(a);
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const alloc = gpa.allocator();
+
+    var ctx: Context = .init(alloc);
     defer ctx.deinit();
 
-    try util.processFile(a, "input/day8", &ctx, callback, '\n');
+    try util.processFile(alloc, "input/day8", &ctx, callback, '\n');
 
     const res = try run(ctx);
-    try std.testing.expectEqual(129_564, res.part1);
-    try std.testing.expectEqual(42_047_840, res.part2);
+    std.debug.assert(129_564 == res.part1);
+    std.debug.assert(42_047_840 == res.part2);
+
+    std.debug.print("Part 1: {d}\nPart 2: {d}\n", .{ res.part1, res.part2 });
 }

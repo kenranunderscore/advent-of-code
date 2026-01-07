@@ -19,45 +19,30 @@ pub fn build(b: *std.Build) !void {
         }
     }
 
-    const test_all = b.step("test", "Run tests for all AoC days");
     for (days.items) |day| {
         const day_name = try std.fmt.allocPrint(b.allocator, "day{d}", .{day});
         const path = try std.fmt.allocPrint(b.allocator, "src/{s}.zig", .{day_name});
-        const tests = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path(path),
-                .target = target,
-                .optimize = optimize,
-            }),
+
+        const mod = b.createModule(.{
+            .root_source_file = b.path(path),
+            .target = target,
+            .optimize = optimize,
         });
 
-        const day_step = b.step(
+        const exe = b.addExecutable(.{
+            .name = day_name,
+            .root_module = mod,
+        });
+        const run = b.addRunArtifact(exe);
+
+        const tests = b.addTest(.{ .root_module = mod });
+        const run_tests = b.addRunArtifact(tests);
+
+        const step = b.step(
             day_name,
-            try std.fmt.allocPrint(b.allocator, "Run tests for day {d}", .{day}),
+            try std.fmt.allocPrint(b.allocator, "Run day {d}", .{day}),
         );
-        const run_day_tests = b.addRunArtifact(tests);
-        day_step.dependOn(&run_day_tests.step);
-        test_all.dependOn(&run_day_tests.step);
+        step.dependOn(&run.step);
+        step.dependOn(&run_tests.step);
     }
-
-    const day9_mod = b.addModule("day9mod", .{
-        .root_source_file = b.path("src/day9.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const day9 = b.addExecutable(.{
-        .name = "day9",
-        .root_module = day9_mod,
-    });
-    const day9_step = b.step("day9run", "Run day 9");
-    const day9_run_cmd = b.addRunArtifact(day9);
-    day9_run_cmd.step.dependOn(b.getInstallStep());
-    day9_step.dependOn(&day9_run_cmd.step);
-
-    const day9_check = b.addExecutable(.{
-        .name = "day9check",
-        .root_module = day9_mod,
-    });
-    const check = b.step("check", "Check whether the component compiles");
-    check.dependOn(&day9_check.step);
 }

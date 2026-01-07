@@ -239,7 +239,7 @@ fn getRects(
 pub fn part1(
     alloc: std.mem.Allocator,
     points: []const P,
-) !void {
+) !u64 {
     var rects = try getRects(alloc, points);
     defer rects.deinit(alloc);
 
@@ -250,7 +250,7 @@ pub fn part1(
         }
     }
 
-    print("Part 1: {d}\n", .{max});
+    return max;
 }
 
 fn containsPoint(points: []const P, p: P) bool {
@@ -275,23 +275,21 @@ const example_points: []const P = &[_]P{
 pub fn part2(
     alloc: std.mem.Allocator,
     points: []const P,
-) !void {
+) !u64 {
     var loop = try Loop.init(alloc, points);
     defer loop.deinit();
-    print("Loop calculation done\n", .{});
 
     var rects = try getRects(alloc, points);
     defer rects.deinit(alloc);
     std.sort.heap(Rect, rects.items, {}, Rect.areaGreaterThan);
-    print("Rect calculation done\n", .{});
 
-    for (rects.items, 0..) |rect, i| {
-        print("  Processing rect {d}/{d}\n", .{ i, rects.items.len });
+    for (rects.items) |rect| {
         if (loop.containsRect(rect)) {
-            print("    Found it! Its area is {d}\n", .{rect.area()});
-            break;
+            return rect.area();
         }
     }
+
+    return error.NotFound;
 }
 
 pub fn main() !void {
@@ -311,8 +309,10 @@ pub fn main() !void {
         try points.append(gpa, try parsePoint(line));
     }
 
-    try part1(gpa, points.items);
-    try part2(gpa, points.items);
+    const part1_result = try part1(gpa, points.items);
+    const part2_result = try part2(gpa, points.items);
+
+    print("Part 1: {d}\nPart 2: {d}\n", .{ part1_result, part2_result });
 }
 
 test "Rect.area" {

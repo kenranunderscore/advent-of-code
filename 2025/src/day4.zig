@@ -73,7 +73,11 @@ test "countNeighbors" {
     try std.testing.expectEqual(1, countNeighbors(lines, 0, 0));
 }
 
-test {
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const alloc = gpa.allocator();
+
     const input = try std.fs.cwd().openFile(
         "input/day4",
         .{ .mode = .read_only },
@@ -81,25 +85,26 @@ test {
     defer input.close();
 
     const stat = try input.stat();
-    const a = std.testing.allocator;
-    const buf = try input.readToEndAlloc(a, stat.size);
-    defer a.free(buf);
+    const buf = try input.readToEndAlloc(alloc, stat.size);
+    defer alloc.free(buf);
 
     var tokens = std.mem.tokenizeScalar(u8, buf, '\n');
-    var lines = try std.ArrayList([]u8).initCapacity(a, stat.size);
+    var lines = try std.ArrayList([]u8).initCapacity(alloc, stat.size);
     defer {
-        for (lines.items) |item| a.free(item);
-        lines.deinit(a);
+        for (lines.items) |item| alloc.free(item);
+        lines.deinit(alloc);
     }
 
     while (tokens.next()) |line| {
-        const owned = try a.dupe(u8, line);
-        try lines.append(a, owned);
+        const owned = try alloc.dupe(u8, line);
+        try lines.append(alloc, owned);
     }
 
     const part1_result = try part1(lines);
-    try std.testing.expectEqual(1460, part1_result);
+    std.debug.assert(1460 == part1_result);
 
     const part2_result = try part2(lines);
-    try std.testing.expectEqual(9243, part2_result);
+    std.debug.assert(9243 == part2_result);
+
+    std.debug.print("Part 1: {d}\nPart 2: {d}\n", .{ part1_result, part2_result });
 }

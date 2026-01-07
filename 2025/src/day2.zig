@@ -95,19 +95,6 @@ test {
     var ctx = Context{};
     try util.processFile(
         std.testing.allocator,
-        "input/day2",
-        &ctx,
-        callback,
-        ',',
-    );
-
-    try std.testing.expectEqual(55916882972, ctx.sum);
-}
-
-test {
-    var ctx = Context{};
-    try util.processFile(
-        std.testing.allocator,
         "input/day2_test_input",
         &ctx,
         callback,
@@ -125,15 +112,30 @@ test "valid part 2" {
     try std.testing.expect(!try validForPart2(2121212121));
 }
 
-test {
-    var ctx = Context{};
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const alloc = gpa.allocator();
+
+    var ctx_part1 = Context{};
     try util.processFile(
-        std.testing.allocator,
+        alloc,
         "input/day2",
-        &ctx,
+        &ctx_part1,
+        callback,
+        ',',
+    );
+    std.debug.assert(55916882972 == ctx_part1.sum);
+
+    var ctx_part2 = Context{};
+    try util.processFile(
+        alloc,
+        "input/day2",
+        &ctx_part2,
         callbackPart2,
         ',',
     );
+    std.debug.assert(76169125915 == ctx_part2.sum);
 
-    try std.testing.expectEqual(76169125915, ctx.sum);
+    std.debug.print("Part 1: {d}\nPart 2: {d}\n", .{ ctx_part1.sum, ctx_part2.sum });
 }
